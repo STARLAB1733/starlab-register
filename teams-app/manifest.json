@@ -1,0 +1,37 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "f47920a0-b1c2-4d3e-9f50-6a7b8c9d0e1f",
+  "packageName": "sg.starlab.personnel.checklist",
+  "developer": {
+    "name": "STARLAB S1",
+    "websiteUrl": "https://YOUR-APP.vercel.app",
+    "privacyUrl": "https://YOUR-APP.vercel.app",
+    "termsOfUseUrl": "https://YOUR-APP.vercel.app"
+  },
+  "name": {
+    "short": "STARLAB Checklist",
+    "full": "STARLAB Personnel In/Out Register"
+  },
+  "description": {
+    "short": "Onboarding & offboarding checklist",
+    "full": "STARLAB S1 Branch Personnel Onboarding and Offboarding Register"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#f47920",
+  "staticTabs": [
+    {
+      "entityId": "starlab-checklist",
+      "name": "Personnel Register",
+      "contentUrl": "https://YOUR-APP.vercel.app",
+      "websiteUrl": "https://YOUR-APP.vercel.app",
+      "scopes": ["personal", "team", "groupchat"]
+    }
+  ],
+  "permissions": ["identity"],
+  "validDomains": ["YOUR-APP.vercel.app"]
+}
