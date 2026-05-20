@@ -130,9 +130,6 @@ const OFFBOARDING = [
     key: "s1", category: "S1 — Manpower Officer",
     poc: "ME4 Anthony Tan", icon: User,
     items: [
-      { id: "off-s1-01", task: "Leave balance cleared / encashed" },
-      { id: "off-s1-02", task: "Final pay computation confirmed" },
-      { id: "off-s1-03", task: "Allowance cessation processed" },
       { id: "off-s1-04", task: "eHR record updated to departed status" },
       { id: "off-s1-05", task: "Exit documentation completed" },
     ]
@@ -240,7 +237,11 @@ export default function App() {
   const [record, setRecord] = useState(null);
   const [adminMode, setAdminMode] = useState(false);
 
-  useEffect(() => { if (record) saveRecord(record); }, [record]);
+  useEffect(() => {
+    if (!record) return;
+    const timer = setTimeout(() => saveRecord(record), 800);
+    return () => clearTimeout(timer);
+  }, [record]);
 
   const updateItem = (sectionKey, itemId, patch) => {
     setRecord((r) => ({
@@ -278,7 +279,7 @@ export default function App() {
           />
         )}
         {view === "submitted" && record && <SubmittedScreen record={record} onHome={() => { setView("identify"); setRecord(null); }} />}
-        {view === "admin" && <AdminScreen onView={(r) => { setRecord(r); setView(r.submitted ? "submitted" : "checklist"); setAdminMode(false); }} />}
+        {view === "admin" && <AdminScreen onView={(r) => { setRecord(r); setView(r.submitted ? "submitted" : "checklist"); setAdminMode(false); }} onLogout={() => { setAdminMode(false); setView("identify"); }} />}
       </main>
       <Footer />
     </div>
@@ -449,12 +450,16 @@ function Field({ label, value, onChange, placeholder, type = "text", mono = fals
   );
 }
 
+const isOptionalItem = (task) => task.includes("(Optional)");
+
 function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
   const [openSection, setOpenSection] = useState(record.sections[0]?.key);
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
-    const done = all.filter((it) => it.done).length;
-    return { total: all.length, done, pct: Math.round((done / all.length) * 100) };
+    const required = all.filter((it) => !isOptionalItem(it.task));
+    const done = required.filter((it) => it.done).length;
+    const total = required.length;
+    return { total, done, pct: total ? Math.round((done / total) * 100) : 100 };
   }, [record]);
   const allDone = stats.done === stats.total;
 
@@ -495,8 +500,9 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
         {record.sections.map((s) => {
           const defs = (record.type === "onboarding" ? ONBOARDING : OFFBOARDING).find((x) => x.key === s.key);
           const Icon = defs?.icon || ClipboardList;
-          const done = s.items.filter((it) => it.done).length;
-          const total = s.items.length;
+          const required = s.items.filter((it) => !isOptionalItem(it.task));
+          const done = required.filter((it) => it.done).length;
+          const total = required.length;
           const isOpen = openSection === s.key;
           const isComplete = done === total;
           return (
@@ -540,17 +546,26 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
 
 function ItemRow({ item, onChange }) {
   const [showNotes, setShowNotes] = useState(false);
+  const optional = isOptionalItem(item.task);
+  const displayTask = item.task.replace(" (Optional)", "");
   const toggle = () => onChange({ done: !item.done, doneAt: !item.done ? new Date().toISOString() : null });
   return (
-    <div className="px-4 sm:px-5 py-3.5 flex items-start gap-3 border-b last:border-b-0" style={{ borderColor: COLORS.border }}>
+    <div className="px-4 sm:px-5 py-3.5 flex items-start gap-3 border-b last:border-b-0" style={{ borderColor: COLORS.border, opacity: optional ? 0.75 : 1 }}>
       <button onClick={toggle}
         className="mt-0.5 w-5 h-5 flex items-center justify-center shrink-0 transition"
         style={{ background: item.done ? COLORS.success : "transparent", border: `1.5px solid ${item.done ? COLORS.success : COLORS.textMuted}` }}>
         {item.done && <Check size={13} color="white" strokeWidth={3.5} />}
       </button>
       <div className="flex-1 min-w-0">
-        <div className="text-sm leading-snug" style={{ color: item.done ? COLORS.textMuted : COLORS.text, textDecoration: item.done ? "line-through" : "none" }}>
-          {item.task}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm leading-snug" style={{ color: item.done ? COLORS.textMuted : optional ? COLORS.textMuted : COLORS.text, textDecoration: item.done ? "line-through" : "none" }}>
+            {displayTask}
+          </span>
+          {optional && (
+            <span className="font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 shrink-0" style={{ background: COLORS.border, color: COLORS.textMuted }}>
+              optional
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
           <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: COLORS.textMuted }}>{item.id}</span>
@@ -576,15 +591,17 @@ function ItemRow({ item, onChange }) {
 }
 
 function DeclarationScreen({ record, setRecord, onSign, onBack }) {
-  const [typed, setTyped] = useState("");
+  const [typedName, setTypedName] = useState("");
+  const [typedEmail, setTypedEmail] = useState("");
   const [agreed, setAgreed] = useState(false);
-  const matches = typed.trim().toUpperCase() === record.name.trim().toUpperCase();
-  const canSubmit = matches && agreed;
+  const nameMatches = typedName.trim().toUpperCase() === record.name.trim().toUpperCase();
+  const emailMatches = typedEmail.trim().toLowerCase() === record.email.toLowerCase();
+  const canSubmit = nameMatches && emailMatches && agreed;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
     const submittedAt = new Date().toISOString();
-    setRecord((r) => ({ ...r, submitted: true, submittedAt, declarationName: typed.trim() }));
+    setRecord((r) => ({ ...r, submitted: true, submittedAt, declarationName: typedName.trim(), declarationEmail: typedEmail.trim() }));
     onSign();
   };
 
@@ -625,14 +642,30 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
 
           <div>
             <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>
-              Type your full name to sign: <span style={{ color: COLORS.accent }}>(must match exactly)</span>
+              Full name <span style={{ color: COLORS.accent }}>(must match exactly)</span>
             </label>
-            <input type="text" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={record.name}
+            <input type="text" value={typedName} onChange={(e) => setTypedName(e.target.value)} placeholder={record.name}
               className="w-full px-4 py-3 outline-none text-base"
-              style={{ background: COLORS.bg, border: `2px solid ${matches ? COLORS.success : COLORS.border}`, letterSpacing: "0.02em" }} />
-            <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: matches ? COLORS.success : COLORS.textMuted }}>
-              {matches ? "✓ Name matches record" : `Expected: ${record.name}`}
-            </div>
+              style={{ background: COLORS.bg, border: `2px solid ${typedName && nameMatches ? COLORS.success : COLORS.border}`, letterSpacing: "0.02em" }} />
+            {typedName && (
+              <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: nameMatches ? COLORS.success : "#e05c5c" }}>
+                {nameMatches ? "✓ Name matches record" : `Expected: ${record.name}`}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>
+              Personal email <span style={{ color: COLORS.accent }}>(must match exactly)</span>
+            </label>
+            <input type="email" value={typedEmail} onChange={(e) => setTypedEmail(e.target.value)} placeholder={record.email}
+              className="w-full px-4 py-3 outline-none text-base font-mono"
+              style={{ background: COLORS.bg, border: `2px solid ${typedEmail && emailMatches ? COLORS.success : COLORS.border}` }} />
+            {typedEmail && (
+              <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: emailMatches ? COLORS.success : "#e05c5c" }}>
+                {emailMatches ? "✓ Email matches record" : "Email does not match"}
+              </div>
+            )}
           </div>
         </div>
 
@@ -653,7 +686,8 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
 function SubmittedScreen({ record, onHome }) {
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
-    return { total: all.length, done: all.filter((it) => it.done).length };
+    const required = all.filter((it) => !isOptionalItem(it.task));
+    return { total: required.length, done: required.filter((it) => it.done).length };
   }, [record]);
 
   return (
@@ -678,6 +712,7 @@ function SubmittedScreen({ record, onHome }) {
         <DataRow label={record.type === "onboarding" ? "Reporting Date" : "Last Day"} value={record.keyDate} />
         <DataRow label="Items Completed" value={`${stats.done} / ${stats.total}`} />
         <DataRow label="Signed As" value={record.declarationName} />
+        <DataRow label="Signed Email" value={record.declarationEmail} />
         <DataRow label="Submitted On" value={new Date(record.submittedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })} />
       </div>
 
@@ -697,8 +732,14 @@ function DataRow({ label, value, mono = false }) {
   );
 }
 
-function AdminScreen({ onView }) {
+function AdminScreen({ onView, onLogout }) {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem("starlab_admin_auth") === "1");
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("starlab_admin_auth");
+    setAuthed(false);
+    onLogout?.();
+  };
   const [pw, setPw] = useState("");
   const [pwError, setPwError] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
@@ -785,11 +826,16 @@ function AdminScreen({ onView }) {
       <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// S1 Admin View</div>
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none">Personnel Register</h1>
-        {records && records.length > 0 && (
-          <button onClick={exportData} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
-            Export JSON
+        <div className="flex gap-2 flex-wrap">
+          {records && records.length > 0 && (
+            <button onClick={exportData} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
+              Export JSON
+            </button>
+          )}
+          <button onClick={handleLogout} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
+            Logout
           </button>
-        )}
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap mb-6">
@@ -819,8 +865,9 @@ function AdminScreen({ onView }) {
       <div className="space-y-2">
         {filtered.map((r) => {
           const all = r.sections.flatMap((s) => s.items);
-          const done = all.filter((it) => it.done).length;
-          const pct = Math.round((done / all.length) * 100);
+          const required = all.filter((it) => !isOptionalItem(it.task));
+          const done = required.filter((it) => it.done).length;
+          const pct = required.length ? Math.round((done / required.length) * 100) : 100;
           return (
             <button key={r.phoneNumber} onClick={() => onView(r)}
               className="w-full text-left p-4 surface-shadow flex items-center gap-4 hover:bg-white/[0.04] transition"
@@ -836,13 +883,16 @@ function AdminScreen({ onView }) {
                       style={{ background: COLORS.success, color: "white" }}><Lock size={9} /> Signed</span>
                   )}
                 </div>
-                <div className="font-mono text-[11px] mt-1" style={{ color: COLORS.textMuted }}>
-                  {r.phoneNumber} · {r.email} · {r.vocation} · {r.keyDate}
+                <div className="font-mono text-[11px] mt-1 truncate" style={{ color: COLORS.textMuted }}>
+                  {r.phoneNumber} · {r.vocation}
+                </div>
+                <div className="font-mono text-[11px] truncate" style={{ color: COLORS.textMuted }}>
+                  {r.email} · {r.keyDate}
                 </div>
               </div>
               <div className="text-right shrink-0">
                 <div className="font-display font-bold text-xl leading-none" style={{ color: COLORS.primary }}>{pct}%</div>
-                <div className="font-mono text-[10px] uppercase tracking-widest" style={{ color: COLORS.textMuted }}>{done}/{all.length}</div>
+                <div className="font-mono text-[10px] uppercase tracking-widest" style={{ color: COLORS.textMuted }}>{done}/{required.length}</div>
               </div>
               <Eye size={16} className="shrink-0" style={{ color: COLORS.textMuted }} />
             </button>
