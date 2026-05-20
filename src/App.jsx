@@ -4,6 +4,7 @@ import {
   UserCheck, Check, Lock, ChevronRight, ChevronLeft,
   AlertCircle, Eye, ArrowLeft, ClipboardList, LogIn, Loader2
 } from "lucide-react";
+import { saveRecord, loadRecord, listAllRecords } from "./lib/storage";
 
 // ============================================================
 // VALIDATION HELPERS
@@ -15,19 +16,24 @@ const validatePhone = (v) => {
 const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 const validateDate = (v) => {
   if (!v) return "Required";
-  const d = new Date(v);
-  const day = d.getDay();
+  const [y, m, d] = v.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const day = date.getDay();
   if (day === 0 || day === 6) return "Must be a weekday (Mon–Fri)";
   const oneYearFromNow = new Date();
   oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-  if (d > oneYearFromNow) return "Date must be within 1 year from today";
+  if (date > oneYearFromNow) return "Date must be within 1 year from today";
   return null;
 };
 const normalisePhone = (v) => {
   const cleaned = v.replace(/\s/g, "");
   return cleaned.startsWith("+65") ? cleaned : `+65${cleaned}`;
 };
-import { saveRecord, loadRecord, listAllRecords } from "./lib/storage";
+const formatDate = (v) => {
+  if (!v) return v;
+  const [y, m, d] = v.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+};
 
 // ============================================================
 // CHECKLIST DATA — STARLAB customised
@@ -226,8 +232,11 @@ const COLORS = {
   text: "#f0f0f0",
   textMuted: "#888888",
   border: "#2a2a2a",
+  onboarding: "#1a6b4a",
+  offboarding: "#7a3010",
 };
 
+const isOptionalItem = (task) => task.includes("(Optional)");
 
 // ============================================================
 // APP
@@ -268,7 +277,7 @@ export default function App() {
           <ChecklistScreen
             record={record} updateItem={updateItem}
             onSubmit={() => setView("declaration")}
-            onBack={() => setView("identify")}
+            onBack={() => { setView("identify"); setRecord(null); }}
           />
         )}
         {view === "declaration" && record && (
@@ -293,12 +302,12 @@ function Header({ onAdmin, onHome, isAdmin }) {
         <button onClick={onHome} className="flex items-center gap-3 group">
           <img src="/starlab-logo.png" alt="STARLAB" className="h-10 sm:h-12 w-auto object-contain" />
           <div className="font-mono text-[10px] sm:text-xs uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
-            Personnel In/Out Register
+            STARLAB Personnel Register
           </div>
         </button>
         <button
           onClick={isAdmin ? onHome : onAdmin}
-          className="font-mono text-[10px] sm:text-xs uppercase tracking-widest px-3 py-2 transition hover:opacity-80"
+          className="font-mono text-[10px] sm:text-xs uppercase tracking-widest px-3 py-2 transition hover:opacity-80 shrink-0"
           style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}
         >
           {isAdmin ? "← Personnel View" : "S1 Admin →"}
@@ -311,7 +320,7 @@ function Header({ onAdmin, onHome, isAdmin }) {
 function Footer() {
   return (
     <footer className="max-w-4xl mx-auto px-4 sm:px-6 py-8 mt-8 font-mono text-[10px] uppercase tracking-widest text-center" style={{ color: COLORS.textMuted, borderTop: `1px solid ${COLORS.border}` }}>
-      <div className="pt-6">STARLAB · S1 Branch · Personnel Onboarding & Offboarding Register · Local Dev v1.1</div>
+      <div className="pt-6">STARLAB · S1 Branch · Personnel Onboarding & Offboarding Register · v2.0</div>
     </footer>
   );
 }
@@ -322,7 +331,7 @@ function IdentifyScreen({ onContinue }) {
   const [rank, setRank] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [vocation, setVocation] = useState("Regular (Officer)");
+  const [vocation, setVocation] = useState("Regular (C4X)");
   const [keyDate, setKeyDate] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -332,14 +341,13 @@ function IdentifyScreen({ onContinue }) {
     if (!name.trim()) e.name = "Required";
     if (!rank.trim()) e.rank = "Required";
     if (!phone.trim()) e.phone = "Required";
-    else if (!validatePhone(phone)) e.phone = "Enter a valid SG mobile (+65XXXXXXXX or 8-digit starting with 8/9)";
+    else if (!validatePhone(phone)) e.phone = "Enter a valid SG mobile (8-digit starting with 8 or 9, or +65 prefix)";
     if (!email.trim()) e.email = "Required";
     else if (!validateEmail(email)) e.email = "Enter a valid email address";
-    const dateErr = validateDate(keyDate); if (dateErr) e.keyDate = dateErr;
+    const dateErr = validateDate(keyDate);
+    if (dateErr) e.keyDate = dateErr;
     return e;
   };
-
-  const hasErrors = Object.keys(validate()).length > 0;
 
   const handleContinue = async () => {
     const e = validate();
@@ -359,7 +367,8 @@ function IdentifyScreen({ onContinue }) {
         name: name.trim(), rank: rank.trim(),
         vocation, keyDate, type, sections,
         createdAt: new Date().toISOString(),
-        submitted: false, submittedAt: null, declarationName: ""
+        submitted: false, submittedAt: null,
+        declarationName: "", declarationEmail: "",
       });
     } catch {
       setErrors({ _: "Connection error. Please try again." });
@@ -374,7 +383,7 @@ function IdentifyScreen({ onContinue }) {
         <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// Step 1 of 3</div>
         <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none mb-3">Personnel Identification</h1>
         <p className="text-sm sm:text-base" style={{ color: COLORS.textMuted }}>
-          Identify yourself to access your onboarding or offboarding checklist. If you've already started, your progress will resume automatically.
+          Enter your details to begin or resume your checklist. Returning? Use the same phone number to pick up where you left off.
         </p>
       </div>
 
@@ -418,7 +427,7 @@ function IdentifyScreen({ onContinue }) {
         </div>
 
         {errors._ && (
-          <div className="flex items-center gap-2 text-sm font-mono" style={{ color: COLORS.accent }}>
+          <div className="flex items-center gap-2 text-sm font-mono" style={{ color: "#e05c5c" }}>
             <AlertCircle size={16} /> {errors._}
           </div>
         )}
@@ -427,12 +436,12 @@ function IdentifyScreen({ onContinue }) {
           className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
           style={{ background: COLORS.primary, color: "#0d0d0d" }}>
           {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
-          {loading ? "Loading..." : "Begin / Resume Checklist"}
+          {loading ? "Loading…" : "Begin / Resume Checklist"}
         </button>
       </div>
 
       <div className="mt-6 p-4 font-mono text-xs leading-relaxed" style={{ border: `1px dashed ${COLORS.border}`, color: COLORS.textMuted }}>
-        <span className="uppercase font-semibold" style={{ color: COLORS.primary }}>Note:</span> Each item must be completed in person with the responsible POC. After all items are completed, you will sign a declaration attesting that you have personally received each briefing.
+        <span className="uppercase font-semibold" style={{ color: COLORS.primary }}>Note:</span> Complete each item in person with the responsible POC. Once all required items are ticked, you will sign a declaration attesting that each briefing was personally received.
       </div>
     </div>
   );
@@ -450,8 +459,6 @@ function Field({ label, value, onChange, placeholder, type = "text", mono = fals
   );
 }
 
-const isOptionalItem = (task) => task.includes("(Optional)");
-
 function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
   const [openSection, setOpenSection] = useState(record.sections[0]?.key);
   const stats = useMemo(() => {
@@ -466,20 +473,20 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
   return (
     <div>
       <button onClick={onBack} className="font-mono text-xs uppercase tracking-widest mb-4 inline-flex items-center gap-1 hover:opacity-70" style={{ color: COLORS.textMuted }}>
-        <ArrowLeft size={12} /> Back
+        <ArrowLeft size={12} /> Change Details
       </button>
 
       <div className="surface-shadow mb-6 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: COLORS.accent }}>
-            // {record.type === "onboarding" ? "Inbound" : "Outbound"} Personnel
+            // Step 2 of 3 — {record.type === "onboarding" ? "Inbound" : "Outbound"} Personnel
           </div>
           <div className="font-display font-bold text-2xl uppercase tracking-wide leading-tight">{record.rank} {record.name}</div>
           <div className="font-mono text-xs mt-1" style={{ color: COLORS.textMuted }}>
             {record.phoneNumber} · {record.vocation}
           </div>
           <div className="font-mono text-xs mt-0.5" style={{ color: COLORS.textMuted }}>
-            {record.type === "onboarding" ? "Reporting" : "Last Day"}: {record.keyDate}
+            {record.type === "onboarding" ? "Reporting" : "Last Day"}: {formatDate(record.keyDate)}
           </div>
         </div>
         <div className="sm:text-right">
@@ -487,7 +494,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
             {stats.pct}<span className="text-xl">%</span>
           </div>
           <div className="font-mono text-[10px] uppercase tracking-widest mt-1" style={{ color: COLORS.textMuted }}>
-            {stats.done} / {stats.total} completed
+            {stats.done} / {stats.total} required
           </div>
         </div>
       </div>
@@ -506,7 +513,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
           const isOpen = openSection === s.key;
           const isComplete = done === total;
           return (
-            <div key={s.key} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }} className="surface-shadow">
+            <div key={s.key} style={{ background: COLORS.surface, border: `1px solid ${isComplete ? COLORS.success : COLORS.border}` }} className="surface-shadow">
               <button onClick={() => setOpenSection(isOpen ? null : s.key)}
                 className="w-full px-4 sm:px-5 py-4 flex items-center gap-4 text-left hover:bg-white/[0.03]">
                 <div className="w-10 h-10 flex items-center justify-center shrink-0" style={{ background: isComplete ? COLORS.success : COLORS.bg, color: isComplete ? "white" : COLORS.primary, border: `1px solid ${isComplete ? COLORS.success : COLORS.border}` }}>
@@ -514,7 +521,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-display font-bold text-sm sm:text-base uppercase tracking-wide leading-tight">{s.category}</div>
-                  <div className="font-mono text-[11px] mt-0.5 truncate" style={{ color: COLORS.textMuted }}>POC: {s.poc} · {done}/{total}</div>
+                  <div className="font-mono text-[11px] mt-0.5 truncate" style={{ color: COLORS.textMuted }}>POC: {s.poc} · {done}/{total} required</div>
                 </div>
                 <ChevronRight size={18} className="transition-transform shrink-0" style={{ transform: isOpen ? "rotate(90deg)" : "none", color: COLORS.textMuted }} />
               </button>
@@ -531,7 +538,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
       <div className="mt-8 pt-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
         {!allDone && (
           <div className="font-mono text-xs uppercase tracking-widest mb-3 text-center" style={{ color: COLORS.textMuted }}>
-            Complete all {stats.total} items to proceed to declaration
+            {stats.total - stats.done} required item{stats.total - stats.done !== 1 ? "s" : ""} remaining before declaration
           </div>
         )}
         <button onClick={onSubmit} disabled={!allDone}
@@ -550,7 +557,7 @@ function ItemRow({ item, onChange }) {
   const displayTask = item.task.replace(" (Optional)", "");
   const toggle = () => onChange({ done: !item.done, doneAt: !item.done ? new Date().toISOString() : null });
   return (
-    <div className="px-4 sm:px-5 py-3.5 flex items-start gap-3 border-b last:border-b-0" style={{ borderColor: COLORS.border, opacity: optional ? 0.75 : 1 }}>
+    <div className="px-4 sm:px-5 py-3.5 flex items-start gap-3 border-b last:border-b-0" style={{ borderColor: COLORS.border, opacity: optional ? 0.72 : 1 }}>
       <button onClick={toggle}
         className="mt-0.5 w-5 h-5 flex items-center justify-center shrink-0 transition"
         style={{ background: item.done ? COLORS.success : "transparent", border: `1.5px solid ${item.done ? COLORS.success : COLORS.textMuted}` }}>
@@ -568,7 +575,6 @@ function ItemRow({ item, onChange }) {
           )}
         </div>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
-          <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: COLORS.textMuted }}>{item.id}</span>
           {item.done && item.doneAt && (
             <span className="font-mono text-[10px]" style={{ color: COLORS.success }}>
               ✓ {new Date(item.doneAt).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}
@@ -580,9 +586,9 @@ function ItemRow({ item, onChange }) {
         </div>
         {showNotes && (
           <textarea value={item.notes} onChange={(e) => onChange({ notes: e.target.value })}
-            placeholder="Optional notes (e.g. follow-up required)"
+            placeholder="Add a note (e.g. follow-up required, pending action)"
             className="mt-2 w-full px-2.5 py-2 outline-none text-xs font-body resize-none"
-            style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}` }}
+            style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }}
             rows={2} />
         )}
       </div>
@@ -608,10 +614,10 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
   return (
     <div className="max-w-2xl mx-auto">
       <button onClick={onBack} className="font-mono text-xs uppercase tracking-widest mb-4 inline-flex items-center gap-1 hover:opacity-70" style={{ color: COLORS.textMuted }}>
-        <ChevronLeft size={12} /> Back to checklist
+        <ChevronLeft size={12} /> Back to Checklist
       </button>
 
-      <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// Final Step — Declaration</div>
+      <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// Step 3 of 3 — Declaration</div>
       <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none mb-6">Personnel Declaration</h1>
 
       <div className="surface-shadow p-5 sm:p-7" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
@@ -646,7 +652,7 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
             </label>
             <input type="text" value={typedName} onChange={(e) => setTypedName(e.target.value)} placeholder={record.name}
               className="w-full px-4 py-3 outline-none text-base"
-              style={{ background: COLORS.bg, border: `2px solid ${typedName && nameMatches ? COLORS.success : COLORS.border}`, letterSpacing: "0.02em" }} />
+              style={{ background: COLORS.bg, border: `2px solid ${typedName && nameMatches ? COLORS.success : COLORS.border}`, letterSpacing: "0.02em", color: COLORS.text }} />
             {typedName && (
               <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: nameMatches ? COLORS.success : "#e05c5c" }}>
                 {nameMatches ? "✓ Name matches record" : `Expected: ${record.name}`}
@@ -660,7 +666,7 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
             </label>
             <input type="email" value={typedEmail} onChange={(e) => setTypedEmail(e.target.value)} placeholder={record.email}
               className="w-full px-4 py-3 outline-none text-base font-mono"
-              style={{ background: COLORS.bg, border: `2px solid ${typedEmail && emailMatches ? COLORS.success : COLORS.border}` }} />
+              style={{ background: COLORS.bg, border: `2px solid ${typedEmail && emailMatches ? COLORS.success : COLORS.border}`, color: COLORS.text }} />
             {typedEmail && (
               <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: emailMatches ? COLORS.success : "#e05c5c" }}>
                 {emailMatches ? "✓ Email matches record" : "Email does not match"}
@@ -699,24 +705,24 @@ function SubmittedScreen({ record, onHome }) {
         <div className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>Submitted & Locked</div>
         <h1 className="font-display font-bold text-2xl sm:text-3xl uppercase tracking-wide leading-none mb-3">Declaration Recorded</h1>
         <p className="text-sm" style={{ color: COLORS.textMuted }}>
-          Your {record.type} checklist and signed declaration have been recorded. The S1 branch will be notified.
+          Your {record.type} checklist and signed declaration have been recorded. Please retain a screenshot for your own reference.
         </p>
       </div>
 
-      <div className="surface-shadow p-5 sm:p-6 space-y-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+      <div className="surface-shadow p-5 sm:p-6 space-y-1" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
         <DataRow label="Personnel" value={`${record.rank} ${record.name}`} />
         <DataRow label="Phone Number" value={record.phoneNumber} mono />
         <DataRow label="Personal Email" value={record.email} />
         <DataRow label="Vocation" value={record.vocation} />
         <DataRow label="Process" value={record.type.toUpperCase()} />
-        <DataRow label={record.type === "onboarding" ? "Reporting Date" : "Last Day"} value={record.keyDate} />
-        <DataRow label="Items Completed" value={`${stats.done} / ${stats.total}`} />
+        <DataRow label={record.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(record.keyDate)} />
+        <DataRow label="Required Items" value={`${stats.done} / ${stats.total} completed`} />
         <DataRow label="Signed As" value={record.declarationName} />
-        <DataRow label="Signed Email" value={record.declarationEmail} />
+        <DataRow label="Signed Email" value={record.declarationEmail || record.email} />
         <DataRow label="Submitted On" value={new Date(record.submittedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })} />
       </div>
 
-      <button onClick={onHome} className="mt-6 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
+      <button onClick={onHome} className="mt-6 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
         Return to Start
       </button>
     </div>
@@ -725,26 +731,26 @@ function SubmittedScreen({ record, onHome }) {
 
 function DataRow({ label, value, mono = false }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5 border-b last:border-b-0" style={{ borderColor: COLORS.border }}>
+    <div className="flex items-baseline justify-between gap-4 py-2 border-b last:border-b-0" style={{ borderColor: COLORS.border }}>
       <div className="font-mono text-[10px] uppercase tracking-widest shrink-0" style={{ color: COLORS.textMuted }}>{label}</div>
-      <div className={`text-sm text-right ${mono ? "font-mono" : ""}`}>{value}</div>
+      <div className={`text-sm text-right break-all ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>
   );
 }
 
 function AdminScreen({ onView, onLogout }) {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem("starlab_admin_auth") === "1");
+  const [pw, setPw] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [records, setRecords] = useState(null);
+  const [filter, setFilter] = useState("all");
 
   const handleLogout = () => {
     sessionStorage.removeItem("starlab_admin_auth");
     setAuthed(false);
     onLogout?.();
   };
-  const [pw, setPw] = useState("");
-  const [pwError, setPwError] = useState("");
-  const [pwLoading, setPwLoading] = useState(false);
-  const [records, setRecords] = useState(null);
-  const [filter, setFilter] = useState("all");
 
   useEffect(() => { if (authed) listAllRecords().then((r) => setRecords(r || [])); }, [authed]);
 
@@ -828,11 +834,11 @@ function AdminScreen({ onView, onLogout }) {
         <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none">Personnel Register</h1>
         <div className="flex gap-2 flex-wrap">
           {records && records.length > 0 && (
-            <button onClick={exportData} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
+            <button onClick={exportData} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition hover:opacity-80" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
               Export JSON
             </button>
           )}
-          <button onClick={handleLogout} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
+          <button onClick={handleLogout} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition hover:opacity-80" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
             Logout
           </button>
         </div>
@@ -856,7 +862,14 @@ function AdminScreen({ onView, onLogout }) {
         ))}
       </div>
 
-      {records && records.length === 0 && (
+      {records === null && (
+        <div className="text-center py-16 font-mono text-xs uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
+          <Loader2 size={16} className="animate-spin inline-block mb-3" style={{ color: COLORS.primary }} />
+          <div>Loading records…</div>
+        </div>
+      )}
+
+      {records !== null && records.length === 0 && (
         <div className="text-center py-16 font-mono text-xs uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
           No records yet — start one from the Personnel view
         </div>
@@ -868,16 +881,16 @@ function AdminScreen({ onView, onLogout }) {
           const required = all.filter((it) => !isOptionalItem(it.task));
           const done = required.filter((it) => it.done).length;
           const pct = required.length ? Math.round((done / required.length) * 100) : 100;
+          const typeBg = r.type === "onboarding" ? COLORS.onboarding : COLORS.offboarding;
           return (
             <button key={r.phoneNumber} onClick={() => onView(r)}
               className="w-full text-left p-4 surface-shadow flex items-center gap-4 hover:bg-white/[0.04] transition"
               style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-              <div className="shrink-0 w-1 self-stretch" style={{ background: r.submitted ? COLORS.success : r.type === "onboarding" ? COLORS.accent : COLORS.primary }} />
+              <div className="shrink-0 w-1 self-stretch" style={{ background: r.submitted ? COLORS.success : COLORS.primary }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-display font-bold text-base uppercase tracking-wide">{r.rank} {r.name}</span>
-                  <span className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5"
-                    style={{ background: r.type === "onboarding" ? COLORS.accent : COLORS.primary, color: "white" }}>{r.type}</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5" style={{ background: typeBg, color: "white" }}>{r.type}</span>
                   {r.submitted && (
                     <span className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5 inline-flex items-center gap-1"
                       style={{ background: COLORS.success, color: "white" }}><Lock size={9} /> Signed</span>
@@ -887,7 +900,7 @@ function AdminScreen({ onView, onLogout }) {
                   {r.phoneNumber} · {r.vocation}
                 </div>
                 <div className="font-mono text-[11px] truncate" style={{ color: COLORS.textMuted }}>
-                  {r.email} · {r.keyDate}
+                  {r.email} · {formatDate(r.keyDate)}
                 </div>
               </div>
               <div className="text-right shrink-0">
