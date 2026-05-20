@@ -24,27 +24,26 @@ import { saveRecord, loadRecord, listAllRecords } from "./lib/storage";
 // ============================================================
 const ONBOARDING = [
   {
-    key: "s1", category: "S1 — Manpower / HR / Admin",
-    poc: "S1 Manpower Officer", icon: User,
+    key: "s1", category: "S1 — Manpower Officer",
+    poc: "ME4 Anthony Tan", icon: User,
     items: [
-      { id: "s1-01", task: "Report to S1 and complete welcome briefing" },
-      { id: "s1-02", task: "Personal particulars verification on eHR (name, NRIC, contact)" },
-      { id: "s1-03", task: "Camp pass / access card application (photo, biometric if required)" },
-      { id: "s1-04", task: "Leave entitlement briefing (AL, MC, off-day claim)" },
+      { id: "s1-01", task: "Complete welcome briefing" },
+      { id: "s1-02", task: "Verify personal particulars (email, phone number, dob, address, nok)" },
+      { id: "s1-03", task: "Collect camp pass / access card application" },
+      { id: "s1-04", task: "Workspace Code of Conduct, Ethics and Policy" },
       { id: "s1-05", task: "Medical records & PES update" },
-      { id: "s1-06", task: "Next-of-kin update" },
-      { id: "s1-07", task: "IPPT records review" },
       { id: "s1-08", task: "Facilities orientation tour (pantry, restrooms, fire exits, smoking points)" },
     ]
   },
   {
-    key: "s2", category: "S2 — Security",
-    poc: "S2 Security Officer", icon: Shield,
+    key: "s2", category: "S2 — Security Officer",
+    poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
     items: [
       { id: "s2-01", task: "Security indoctrination briefing" },
+      { id: "s2-12", task: "Personnel Disciplinary Brief" },
       { id: "s2-02", task: "Official Secrets Act (OSA) acknowledgment signed" },
       { id: "s2-03", task: "Non-Disclosure Agreement signed" },
-      { id: "s2-04", task: "Security clearance level verified against role" },
+      { id: "s2-04", task: "MSD Security clearance level" },
       { id: "s2-05", task: "Classified information handling brief (marking / storage / transmission)" },
       { id: "s2-06", task: "Information management & data classification brief" },
       { id: "s2-07", task: "Physical office access provisioned (door card / biometric / escort)" },
