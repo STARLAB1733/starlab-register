@@ -127,8 +127,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s1", category: "S1 — Manpower / HR / Admin",
-    poc: "S1 Manpower Officer", icon: User,
+    key: "s1", category: "S1 — Manpower Officer",
+    poc: "ME4 Anthony Tan", icon: User,
     items: [
       { id: "off-s1-01", task: "Leave balance cleared / encashed" },
       { id: "off-s1-02", task: "Final pay computation confirmed" },
@@ -138,8 +138,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s2", category: "S2 — Security",
-    poc: "S2 Security Officer", icon: Shield,
+    key: "s2", category: "S2 — Security Officer",
+    poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
     items: [
       { id: "off-s2-01", task: "Classified documents returned & accounted for" },
       { id: "off-s2-02", task: "Safe keys / combinations returned & reset" },
@@ -151,8 +151,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s3", category: "S3 — Operations",
-    poc: "S3 Officer / Deputy Branch Head", icon: Briefcase,
+    key: "s3", category: "S3 — Operations Officer",
+    poc: "ME4 Ryan Tan", icon: Briefcase,
     items: [
       { id: "off-s3-01", task: "Project handover acceptance signed off" },
       { id: "off-s3-02", task: "Final handover meeting with team" },
@@ -160,8 +160,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s4", category: "S4 — Logistics",
-    poc: "S4 Logistics Officer", icon: Package,
+    key: "s4", category: "S4 — Logistics Officer",
+    poc: "ME4 Claudia Chan", icon: Package,
     items: [
       { id: "off-s4-01", task: "Laptop / workstation returned" },
       { id: "off-s4-02", task: "Peripherals returned" },
@@ -175,7 +175,7 @@ const OFFBOARDING = [
   },
   {
     key: "s6", category: "S6 — Training & Exercise",
-    poc: "S6 Training Officer", icon: GraduationCap,
+    poc: "ME5 Melvin Tan", icon: GraduationCap,
     items: [
       { id: "off-s6-01", task: "Training records archived" },
       { id: "off-s6-02", task: "Outstanding training obligations cleared" },
@@ -194,7 +194,7 @@ const OFFBOARDING = [
   },
   {
     key: "last", category: "Last Day Clearance",
-    poc: "S1 / Branch Head", icon: UserCheck,
+    poc: "ME4 Anthony Tan / ME6 Lee Chen Yong", icon: UserCheck,
     items: [
       { id: "off-last-01", task: "All clearance signatures obtained (S1, S2, S3, S4, S6, DPI)" },
       { id: "off-last-02", task: "Camp pass returned to S1 / guardroom" },
