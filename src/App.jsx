@@ -263,6 +263,8 @@ export default function App() {
     }));
   };
 
+  const updateAdminComment = (comment) => setRecord((r) => ({ ...r, adminComment: comment }));
+
   return (
     <div className="min-h-screen paper-bg font-body" style={{ color: COLORS.text }}>
       <FontStyles />
@@ -276,8 +278,13 @@ export default function App() {
         {view === "checklist" && record && (
           <ChecklistScreen
             record={record} updateItem={updateItem}
+            isAdmin={adminMode}
+            onCommentChange={updateAdminComment}
             onSubmit={() => setView("declaration")}
-            onBack={() => { setView("identify"); setRecord(null); }}
+            onBack={adminMode
+              ? () => { setView("admin"); }
+              : () => { setView("identify"); setRecord(null); }
+            }
           />
         )}
         {view === "declaration" && record && (
@@ -287,8 +294,17 @@ export default function App() {
             onBack={() => setView("checklist")}
           />
         )}
-        {view === "submitted" && record && <SubmittedScreen record={record} onHome={() => { setView("identify"); setRecord(null); }} />}
-        {view === "admin" && <AdminScreen onView={(r) => { setRecord(r); setView(r.submitted ? "submitted" : "checklist"); setAdminMode(false); }} onLogout={() => { setAdminMode(false); setView("identify"); }} />}
+        {view === "submitted" && record && (
+          <SubmittedScreen
+            record={record}
+            isAdmin={adminMode}
+            onHome={adminMode
+              ? () => { setView("admin"); }
+              : () => { setView("identify"); setRecord(null); }
+            }
+          />
+        )}
+        {view === "admin" && <AdminScreen onView={(r) => { setRecord(r); setAdminMode(true); setView("checklist"); }} onLogout={() => { setAdminMode(false); setView("identify"); }} />}
       </main>
       <Footer />
     </div>
@@ -368,7 +384,7 @@ function IdentifyScreen({ onContinue }) {
         vocation, keyDate, type, sections,
         createdAt: new Date().toISOString(),
         submitted: false, submittedAt: null,
-        declarationName: "", declarationEmail: "",
+        declarationName: "", declarationEmail: "", adminComment: "",
       });
     } catch {
       setErrors({ _: "Connection error. Please try again." });
@@ -459,7 +475,7 @@ function Field({ label, value, onChange, placeholder, type = "text", mono = fals
   );
 }
 
-function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
+function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false, onCommentChange }) {
   const [openSection, setOpenSection] = useState(record.sections[0]?.key);
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
@@ -473,13 +489,13 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
   return (
     <div>
       <button onClick={onBack} className="font-mono text-xs uppercase tracking-widest mb-4 inline-flex items-center gap-1 hover:opacity-70" style={{ color: COLORS.textMuted }}>
-        <ArrowLeft size={12} /> Change Details
+        <ArrowLeft size={12} /> {isAdmin ? "Back to Register" : "Change Details"}
       </button>
 
       <div className="surface-shadow mb-6 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: COLORS.accent }}>
-            // Step 2 of 3 — {record.type === "onboarding" ? "Inbound" : "Outbound"} Personnel
+            {isAdmin ? "// S1 Admin View" : `// Step 2 of 3 — ${record.type === "onboarding" ? "Inbound" : "Outbound"} Personnel`}
           </div>
           <div className="font-display font-bold text-2xl uppercase tracking-wide leading-tight">{record.rank} {record.name}</div>
           <div className="font-mono text-xs mt-1" style={{ color: COLORS.textMuted }}>
@@ -527,7 +543,11 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
               </button>
               {isOpen && (
                 <div className="border-t" style={{ borderColor: COLORS.border }}>
-                  {s.items.map((it) => <ItemRow key={it.id} item={it} onChange={(patch) => updateItem(s.key, it.id, patch)} />)}
+                  {s.items.map((it) => (
+                    <ItemRow key={it.id} item={it}
+                      readOnly={record.submitted}
+                      onChange={(patch) => updateItem(s.key, it.id, patch)} />
+                  ))}
                 </div>
               )}
             </div>
@@ -535,32 +555,50 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
         })}
       </div>
 
-      <div className="mt-8 pt-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
-        {!allDone && (
-          <div className="font-mono text-xs uppercase tracking-widest mb-3 text-center" style={{ color: COLORS.textMuted }}>
-            {stats.total - stats.done} required item{stats.total - stats.done !== 1 ? "s" : ""} remaining before declaration
+      {isAdmin ? (
+        <div className="mt-8 pt-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
+          <div className="font-mono text-[11px] uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: COLORS.accent }}>
+            <UserCheck size={13} /> S1 Admin Comments
           </div>
-        )}
-        <button onClick={onSubmit} disabled={!allDone}
-          className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-30"
-          style={{ background: allDone ? COLORS.primary : COLORS.border, color: allDone ? "#0d0d0d" : COLORS.textMuted }}>
-          Proceed to Declaration <ChevronRight size={16} />
-        </button>
-      </div>
+          <textarea
+            value={record.adminComment || ""}
+            onChange={(e) => onCommentChange?.(e.target.value)}
+            placeholder="Add remarks, follow-up actions, or clearance notes for this personnel record…"
+            className="w-full px-3 py-3 outline-none text-sm font-body resize-none"
+            style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.text, minHeight: "100px" }}
+          />
+          <div className="font-mono text-[10px] mt-1.5 uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
+            Comments are saved automatically and visible to the personnel member.
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 pt-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
+          {!allDone && (
+            <div className="font-mono text-xs uppercase tracking-widest mb-3 text-center" style={{ color: COLORS.textMuted }}>
+              {stats.total - stats.done} required item{stats.total - stats.done !== 1 ? "s" : ""} remaining before declaration
+            </div>
+          )}
+          <button onClick={onSubmit} disabled={!allDone}
+            className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-30"
+            style={{ background: allDone ? COLORS.primary : COLORS.border, color: allDone ? "#0d0d0d" : COLORS.textMuted }}>
+            Proceed to Declaration <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function ItemRow({ item, onChange }) {
+function ItemRow({ item, onChange, readOnly = false }) {
   const [showNotes, setShowNotes] = useState(false);
   const optional = isOptionalItem(item.task);
   const displayTask = item.task.replace(" (Optional)", "");
-  const toggle = () => onChange({ done: !item.done, doneAt: !item.done ? new Date().toISOString() : null });
+  const toggle = () => { if (!readOnly) onChange({ done: !item.done, doneAt: !item.done ? new Date().toISOString() : null }); };
   return (
     <div className="px-4 sm:px-5 py-3.5 flex items-start gap-3 border-b last:border-b-0" style={{ borderColor: COLORS.border, opacity: optional ? 0.72 : 1 }}>
-      <button onClick={toggle}
+      <button onClick={toggle} disabled={readOnly}
         className="mt-0.5 w-5 h-5 flex items-center justify-center shrink-0 transition"
-        style={{ background: item.done ? COLORS.success : "transparent", border: `1.5px solid ${item.done ? COLORS.success : COLORS.textMuted}` }}>
+        style={{ background: item.done ? COLORS.success : "transparent", border: `1.5px solid ${item.done ? COLORS.success : COLORS.textMuted}`, cursor: readOnly ? "default" : "pointer" }}>
         {item.done && <Check size={13} color="white" strokeWidth={3.5} />}
       </button>
       <div className="flex-1 min-w-0">
@@ -689,7 +727,7 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
   );
 }
 
-function SubmittedScreen({ record, onHome }) {
+function SubmittedScreen({ record, onHome, isAdmin = false }) {
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
     const required = all.filter((it) => !isOptionalItem(it.task));
@@ -705,7 +743,9 @@ function SubmittedScreen({ record, onHome }) {
         <div className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>Submitted & Locked</div>
         <h1 className="font-display font-bold text-2xl sm:text-3xl uppercase tracking-wide leading-none mb-3">Declaration Recorded</h1>
         <p className="text-sm" style={{ color: COLORS.textMuted }}>
-          Your {record.type} checklist and signed declaration have been recorded. Please retain a screenshot for your own reference.
+          {isAdmin
+            ? `${record.type.charAt(0).toUpperCase() + record.type.slice(1)} declaration submitted and locked. Use the checklist view to update items or add remarks.`
+            : `Your ${record.type} checklist and signed declaration have been recorded. Please retain a screenshot for your own reference.`}
         </p>
       </div>
 
@@ -722,8 +762,17 @@ function SubmittedScreen({ record, onHome }) {
         <DataRow label="Submitted On" value={new Date(record.submittedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })} />
       </div>
 
+      {record.adminComment && (
+        <div className="mt-4 p-4 sm:p-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+          <div className="font-mono text-[11px] uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: COLORS.accent }}>
+            <UserCheck size={13} /> S1 Admin Comments
+          </div>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: COLORS.text }}>{record.adminComment}</p>
+        </div>
+      )}
+
       <button onClick={onHome} className="mt-6 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
-        Return to Start
+        {isAdmin ? "Back to Register" : "Return to Start"}
       </button>
     </div>
   );
