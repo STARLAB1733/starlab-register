@@ -155,7 +155,6 @@ const OFFBOARDING = [
     poc: "ME4 Ryan Tan", icon: Briefcase,
     items: [
       { id: "off-s3-01", task: "Project handover acceptance signed off" },
-      { id: "off-s3-02", task: "Final handover meeting with team" },
       { id: "off-s3-03", task: "Outstanding work items reassigned" },
     ]
   },
@@ -165,27 +164,18 @@ const OFFBOARDING = [
     items: [
       { id: "off-s4-01", task: "Laptop / workstation returned" },
       { id: "off-s4-02", task: "Peripherals returned" },
-      { id: "off-s4-03", task: "Locker emptied & key returned" },
+      { id: "off-s4-03", task: "Locker emptied & key reset; all drawn keys to be returned" },
       { id: "off-s4-04", task: "Uniform items returned (if applicable)" },
       { id: "off-s4-05", task: "Office / room keys returned (all sets accounted for)" },
       { id: "off-s4-06", task: "Safe / cabinet keys returned" },
-      { id: "off-s4-07", task: "Vehicle keys returned (if applicable)" },
       { id: "off-s4-08", task: "Any other drawn equipment / stores items returned" },
-    ]
-  },
-  {
-    key: "s6", category: "S6 — Training & Exercise",
-    poc: "ME5 Melvin Tan", icon: GraduationCap,
-    items: [
-      { id: "off-s6-01", task: "Training records archived" },
-      { id: "off-s6-02", task: "Outstanding training obligations cleared" },
     ]
   },
   {
     key: "dpi", category: "DPI — Digital Infrastructure",
     poc: "DPI POC / IT Support", icon: Server,
     items: [
-      { id: "off-dpi-01", task: "Account deactivation request submitted (effective last day)" },
+      { id: "off-dpi-01", task: "Defence mail account deactivation (applies for personnel leaving organisation)" },
       { id: "off-dpi-02", task: "Email auto-forward / handover configured" },
       { id: "off-dpi-03", task: "Personal drive files transferred / archived" },
       { id: "off-dpi-04", task: "Code repository access revoked" },
@@ -196,11 +186,10 @@ const OFFBOARDING = [
     key: "last", category: "Last Day Clearance",
     poc: "ME4 Anthony Tan / ME6 Lee Chen Yong", icon: UserCheck,
     items: [
-      { id: "off-last-01", task: "All clearance signatures obtained (S1, S2, S3, S4, S6, DPI)" },
-      { id: "off-last-02", task: "Camp pass returned to S1 / guardroom" },
+      { id: "off-last-01", task: "All clearance signatures obtained (S1, S2, S3, S4, DPI)" },
+      { id: "off-last-02", task: "Return camp pass to S1" },
       { id: "off-last-05", task: "All keys & access cards confirmed returned (iSAC, office, locker, safe)" },
       { id: "off-last-03", task: "Exit interview with CO / Branch Head completed" },
-      { id: "off-last-04", task: "Forward personal contact details (post-ROD POC)" },
     ]
   },
 ];
