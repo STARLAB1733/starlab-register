@@ -1,5 +1,7 @@
 import { getRedis } from "./_redis.js";
 
+const MAX_RECORD_BYTES = 512 * 1024; // 512 KB per record
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -8,10 +10,47 @@ export default async function handler(req, res) {
 
   try {
     const { serviceNumber, record } = req.body;
+
     if (!serviceNumber) return res.status(400).json({ error: "serviceNumber required" });
+    if (!record) return res.status(400).json({ error: "record required" });
+
+    // Validate record is valid JSON
+    let parsed;
+    try {
+      parsed = typeof record === "string" ? JSON.parse(record) : record;
+    } catch {
+      return res.status(400).json({ error: "record must be valid JSON" });
+    }
+
+    // Validate serviceNumber matches the record's phoneNumber
+    if (parsed.phoneNumber && parsed.phoneNumber !== serviceNumber) {
+      return res.status(400).json({ error: "serviceNumber mismatch" });
+    }
+
+    // Validate record size
+    const serialised = typeof record === "string" ? record : JSON.stringify(record);
+    if (Buffer.byteLength(serialised, "utf8") > MAX_RECORD_BYTES) {
+      return res.status(400).json({ error: "record too large" });
+    }
 
     const redis = getRedis();
-    await redis.set(`record:${serviceNumber}`, record);
+
+    // If an existing record is submitted, only allow adminComment updates
+    const existing = await redis.get(`record:${serviceNumber}`);
+    if (existing) {
+      let existingParsed;
+      try { existingParsed = JSON.parse(existing); } catch { /* ignore */ }
+      if (existingParsed?.submitted) {
+        // Preserve locked fields — only adminComment may change
+        parsed.sections = existingParsed.sections;
+        parsed.submitted = true;
+        parsed.submittedAt = existingParsed.submittedAt;
+        parsed.declarationName = existingParsed.declarationName;
+        parsed.declarationEmail = existingParsed.declarationEmail;
+      }
+    }
+
+    await redis.set(`record:${serviceNumber}`, JSON.stringify(parsed));
     await redis.sadd("all_service_numbers", serviceNumber);
 
     res.status(200).json({ ok: true });

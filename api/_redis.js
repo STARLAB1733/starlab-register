@@ -13,6 +13,11 @@ export function getRedis() {
       lazyConnect: false,
       tls: process.env.REDIS_URL.startsWith("rediss://") ? {} : undefined,
     });
+    client.on("error", (err) => {
+      console.error("[Redis] connection error:", err.message);
+      // Reset so next call creates a fresh client
+      client = null;
+    });
   }
   return client;
 }

@@ -4,15 +4,37 @@ const API = {
   list: "/api/list-records",
 };
 
-export async function saveRecord(record) {
-  try {
-    await fetch(API.save, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceNumber: record.phoneNumber, record: JSON.stringify(record) }),
+// Patch fields that may be missing in records created before certain schema updates
+function patchRecord(record) {
+  if (!record) return null;
+  if (record.adminComment === undefined) record.adminComment = "";
+  if (record.declarationName === undefined) record.declarationName = "";
+  if (record.declarationEmail === undefined) record.declarationEmail = "";
+  if (record.submitted === undefined) record.submitted = false;
+  if (record.submittedAt === undefined) record.submittedAt = null;
+  if (!record.email) record.email = "";
+  if (!record.phoneNumber) record.phoneNumber = record.serviceNumber || "";
+  if (!Array.isArray(record.sections)) record.sections = [];
+  record.sections.forEach((s) => {
+    if (!Array.isArray(s.items)) s.items = [];
+    s.items.forEach((it) => {
+      if (typeof it.done !== "boolean") it.done = false;
+      if (it.doneAt === undefined) it.doneAt = null;
+      if (!it.notes) it.notes = "";
     });
-  } catch (e) {
-    console.error("save failed", e);
+  });
+  return record;
+}
+
+export async function saveRecord(record) {
+  const res = await fetch(API.save, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ serviceNumber: record.phoneNumber, record: JSON.stringify(record) }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to save record");
   }
 }
 
@@ -24,7 +46,9 @@ export async function loadRecord(phoneNumber) {
       body: JSON.stringify({ serviceNumber: phoneNumber }),
     });
     const data = await res.json();
-    return data.record ? JSON.parse(data.record) : null;
+    if (!data.record) return null;
+    const parsed = typeof data.record === "string" ? JSON.parse(data.record) : data.record;
+    return patchRecord(parsed);
   } catch {
     return null;
   }
@@ -37,5 +61,12 @@ export async function listAllRecords() {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || "Failed to load records");
-  return (data.records || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r));
+  return (data.records || []).map((r) => {
+    try {
+      const parsed = typeof r === "string" ? JSON.parse(r) : r;
+      return patchRecord(parsed);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
 }

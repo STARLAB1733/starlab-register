@@ -245,10 +245,16 @@ export default function App() {
   const [view, setView] = useState("identify");
   const [record, setRecord] = useState(null);
   const [adminMode, setAdminMode] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | error
 
   useEffect(() => {
     if (!record) return;
-    const timer = setTimeout(() => saveRecord(record), 800);
+    setSaveStatus("saving");
+    const timer = setTimeout(() => {
+      saveRecord(record)
+        .then(() => setSaveStatus("idle"))
+        .catch(() => setSaveStatus("error"));
+    }, 800);
     return () => clearTimeout(timer);
   }, [record]);
 
@@ -263,7 +269,15 @@ export default function App() {
     }));
   };
 
-  const updateAdminComment = (comment) => setRecord((r) => ({ ...r, adminComment: comment }));
+  const updateAdminComment = (comment) => setRecord((r) => r ? { ...r, adminComment: comment } : null);
+
+  // Force-save current record before navigating away from checklist
+  const leaveChecklist = async (nextFn) => {
+    if (record) {
+      try { await saveRecord(record); } catch { /* best-effort */ }
+    }
+    nextFn();
+  };
 
   return (
     <div className="min-h-screen paper-bg font-body" style={{ color: COLORS.text }}>
@@ -273,17 +287,26 @@ export default function App() {
         onHome={() => { setAdminMode(false); setView("identify"); setRecord(null); }}
         isAdmin={adminMode}
       />
+      {saveStatus === "error" && (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2">
+          <div className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 flex items-center gap-2"
+            style={{ background: "#2a0a0a", border: "1px solid #e05c5c", color: "#e05c5c" }}>
+            <AlertCircle size={12} /> Save failed — check your connection. Changes may not be persisted.
+          </div>
+        </div>
+      )}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {view === "identify" && <IdentifyScreen onContinue={(rec) => { setRecord(rec); setView(rec.submitted ? "submitted" : "checklist"); }} />}
         {view === "checklist" && record && (
           <ChecklistScreen
             record={record} updateItem={updateItem}
             isAdmin={adminMode}
+            saveStatus={saveStatus}
             onCommentChange={updateAdminComment}
             onSubmit={() => setView("declaration")}
             onBack={adminMode
-              ? () => { setView("admin"); }
-              : () => { setView("identify"); setRecord(null); }
+              ? () => leaveChecklist(() => { setView("admin"); })
+              : () => leaveChecklist(() => { setView("identify"); setRecord(null); })
             }
           />
         )}
@@ -304,7 +327,11 @@ export default function App() {
             }
           />
         )}
-        {view === "admin" && <AdminScreen onView={(r) => { setRecord(r); setAdminMode(true); setView("checklist"); }} onLogout={() => { setAdminMode(false); setView("identify"); }} />}
+        {view === "admin" && <AdminScreen
+          onView={(r) => { setRecord(r); setAdminMode(true); setView("checklist"); }}
+          onLogout={() => { setAdminMode(false); setView("identify"); }}
+          refreshToken={record?.phoneNumber}
+        />}
       </main>
       <Footer />
     </div>
@@ -475,7 +502,7 @@ function Field({ label, value, onChange, placeholder, type = "text", mono = fals
   );
 }
 
-function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false, onCommentChange }) {
+function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false, onCommentChange, saveStatus }) {
   const [openSection, setOpenSection] = useState(record.sections[0]?.key);
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
@@ -512,6 +539,12 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
           <div className="font-mono text-[10px] uppercase tracking-widest mt-1" style={{ color: COLORS.textMuted }}>
             {stats.done} / {stats.total} required
           </div>
+          {saveStatus === "saving" && (
+            <div className="font-mono text-[9px] uppercase tracking-widest mt-1" style={{ color: COLORS.textMuted }}>Saving…</div>
+          )}
+          {saveStatus === "error" && (
+            <div className="font-mono text-[9px] uppercase tracking-widest mt-1" style={{ color: "#e05c5c" }}>Save failed</div>
+          )}
         </div>
       </div>
 
@@ -562,13 +595,14 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
           </div>
           <textarea
             value={record.adminComment || ""}
-            onChange={(e) => onCommentChange?.(e.target.value)}
+            onChange={(e) => { if (e.target.value.length <= 2000) onCommentChange?.(e.target.value); }}
             placeholder="Add remarks, follow-up actions, or clearance notes for this personnel record…"
             className="w-full px-3 py-3 outline-none text-sm font-body resize-none"
             style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.text, minHeight: "100px" }}
           />
-          <div className="font-mono text-[10px] mt-1.5 uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
-            Comments are saved automatically and visible to the personnel member.
+          <div className="font-mono text-[10px] mt-1.5 uppercase tracking-widest flex justify-between" style={{ color: COLORS.textMuted }}>
+            <span>Saved automatically · visible to personnel</span>
+            <span>{(record.adminComment || "").length}/2000</span>
           </div>
         </div>
       ) : (
@@ -787,7 +821,7 @@ function DataRow({ label, value, mono = false }) {
   );
 }
 
-function AdminScreen({ onView, onLogout }) {
+function AdminScreen({ onView, onLogout, refreshToken }) {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem("starlab_admin_auth") === "1");
   const [pw, setPw] = useState("");
   const [pwError, setPwError] = useState("");
@@ -802,13 +836,15 @@ function AdminScreen({ onView, onLogout }) {
     onLogout?.();
   };
 
-  useEffect(() => {
-    if (!authed) return;
+  const fetchRecords = () => {
     setRecordsError(null);
     listAllRecords()
       .then((r) => setRecords(r || []))
       .catch((e) => { setRecords([]); setRecordsError(e.message); });
-  }, [authed]);
+  };
+
+  // Fetch on login, and re-fetch whenever admin returns from viewing a record (refreshToken changes)
+  useEffect(() => { if (authed) fetchRecords(); }, [authed, refreshToken]);
 
   if (!authed) {
     const handleAuth = async (e) => {
@@ -894,6 +930,9 @@ function AdminScreen({ onView, onLogout }) {
               Export JSON
             </button>
           )}
+          <button onClick={fetchRecords} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition hover:opacity-80" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
+            Refresh
+          </button>
           <button onClick={handleLogout} className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition hover:opacity-80" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
             Logout
           </button>
