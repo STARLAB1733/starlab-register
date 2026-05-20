@@ -4,6 +4,19 @@ import {
   UserCheck, Check, Lock, ChevronRight, ChevronLeft,
   AlertCircle, Eye, ArrowLeft, ClipboardList, LogIn, Loader2
 } from "lucide-react";
+
+// ============================================================
+// VALIDATION HELPERS
+// ============================================================
+const validatePhone = (v) => {
+  const cleaned = v.replace(/\s/g, "");
+  return /^(\+65)?[89]\d{7}$/.test(cleaned);
+};
+const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const normalisePhone = (v) => {
+  const cleaned = v.replace(/\s/g, "");
+  return cleaned.startsWith("+65") ? cleaned : `+65${cleaned}`;
+};
 import { saveRecord, loadRecord, listAllRecords } from "./lib/storage";
 
 // ============================================================
@@ -321,35 +334,49 @@ function IdentifyScreen({ onContinue }) {
   const [type, setType] = useState("onboarding");
   const [name, setName] = useState("");
   const [rank, setRank] = useState("");
-  const [serviceNumber, setServiceNumber] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [vocation, setVocation] = useState("Regular (Officer)");
-  const [branch, setBranch] = useState("");
   const [keyDate, setKeyDate] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const canContinue = name.trim() && rank.trim() && serviceNumber.trim() && branch.trim() && keyDate;
+  const validate = () => {
+    const e = {};
+    if (!name.trim()) e.name = "Required";
+    if (!rank.trim()) e.rank = "Required";
+    if (!phone.trim()) e.phone = "Required";
+    else if (!validatePhone(phone)) e.phone = "Enter a valid SG mobile (+65XXXXXXXX or 8-digit starting with 8/9)";
+    if (!email.trim()) e.email = "Required";
+    else if (!validateEmail(email)) e.email = "Enter a valid email address";
+    if (!keyDate) e.keyDate = "Required";
+    return e;
+  };
+
+  const hasErrors = Object.keys(validate()).length > 0;
 
   const handleContinue = async () => {
-    setError("");
-    if (!canContinue) { setError("Please fill in all fields."); return; }
+    const e = validate();
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
     setLoading(true);
     try {
-      const svc = serviceNumber.trim().toUpperCase();
-      const existing = await loadRecord(svc);
+      const key = normalisePhone(phone.trim());
+      const existing = await loadRecord(key);
       if (existing) { onContinue(existing); return; }
       const sections = (type === "onboarding" ? ONBOARDING : OFFBOARDING).map((s) => ({
         key: s.key, category: s.category, poc: s.poc,
         items: s.items.map((it) => ({ ...it, done: false, doneAt: null, notes: "" }))
       }));
       onContinue({
-        serviceNumber: svc, name: name.trim(), rank: rank.trim(),
-        vocation, branch: branch.trim(), keyDate, type, sections,
+        phoneNumber: key, email: email.trim().toLowerCase(),
+        name: name.trim(), rank: rank.trim(),
+        vocation, keyDate, type, sections,
         createdAt: new Date().toISOString(),
         submitted: false, submittedAt: null, declarationName: ""
       });
     } catch {
-      setError("Connection error. Please try again.");
+      setErrors({ _: "Connection error. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -380,12 +407,16 @@ function IdentifyScreen({ onContinue }) {
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Full Name" value={name} onChange={setName} placeholder="e.g. Tan Wei Ming" />
-          <Field label="Rank / Title" value={rank} onChange={setRank} placeholder="e.g. ME4 / Mr. / Ms." />
+          <Field label="Full Name" value={name} onChange={(v) => { setName(v); setErrors((e) => ({ ...e, name: undefined })); }} placeholder="e.g. Tan Wei Ming" error={errors.name} />
+          <Field label="Rank / Title" value={rank} onChange={(v) => { setRank(v); setErrors((e) => ({ ...e, rank: undefined })); }} placeholder="e.g. ME4 / Mr. / Ms." error={errors.rank} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Service Number" value={serviceNumber} onChange={setServiceNumber} placeholder="e.g. S1234567A" mono />
+          <Field label="Phone Number" value={phone} onChange={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: undefined })); }} placeholder="e.g. 91234567 or +6591234567" mono error={errors.phone} />
+          <Field label="Personal Email" value={email} onChange={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: undefined })); }} placeholder="e.g. name@gmail.com" error={errors.email} />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Vocation</label>
             <select value={vocation} onChange={(e) => setVocation(e.target.value)} className="w-full px-3 py-2.5 outline-none text-sm" style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }}>
@@ -397,20 +428,16 @@ function IdentifyScreen({ onContinue }) {
               <option>Other</option>
             </select>
           </div>
+          <Field label={type === "onboarding" ? "Reporting Date" : "Last Day"} value={keyDate} onChange={(v) => { setKeyDate(v); setErrors((e) => ({ ...e, keyDate: undefined })); }} type="date" error={errors.keyDate} />
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Posted Workstream" value={branch} onChange={setBranch} placeholder="e.g. STARLAKE" />
-          <Field label={type === "onboarding" ? "Reporting Date" : "Last Day"} value={keyDate} onChange={setKeyDate} type="date" />
-        </div>
-
-        {error && (
+        {errors._ && (
           <div className="flex items-center gap-2 text-sm font-mono" style={{ color: COLORS.accent }}>
-            <AlertCircle size={16} /> {error}
+            <AlertCircle size={16} /> {errors._}
           </div>
         )}
 
-        <button onClick={handleContinue} disabled={!canContinue || loading}
+        <button onClick={handleContinue} disabled={loading}
           className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
           style={{ background: COLORS.primary, color: "#0d0d0d" }}>
           {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
@@ -425,13 +452,14 @@ function IdentifyScreen({ onContinue }) {
   );
 }
 
-function Field({ label, value, onChange, placeholder, type = "text", mono = false }) {
+function Field({ label, value, onChange, placeholder, type = "text", mono = false, error }) {
   return (
     <div>
       <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
         className={`w-full px-3 py-2.5 outline-none text-sm ${mono ? "font-mono" : ""}`}
-        style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }} />
+        style={{ background: COLORS.bg, border: `1px solid ${error ? "#e05c5c" : COLORS.border}`, color: COLORS.text }} />
+      {error && <div className="font-mono text-[10px] mt-1" style={{ color: "#e05c5c" }}>{error}</div>}
     </div>
   );
 }
@@ -458,7 +486,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack }) {
           </div>
           <div className="font-display font-bold text-2xl uppercase tracking-wide leading-tight">{record.rank} {record.name}</div>
           <div className="font-mono text-xs mt-1" style={{ color: COLORS.textMuted }}>
-            {record.serviceNumber} · {record.vocation} · {record.branch}
+            {record.phoneNumber} · {record.vocation}
           </div>
           <div className="font-mono text-xs mt-0.5" style={{ color: COLORS.textMuted }}>
             {record.type === "onboarding" ? "Reporting" : "Last Day"}: {record.keyDate}
@@ -588,7 +616,7 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
         <div className="font-mono text-[11px] uppercase tracking-widest mb-3" style={{ color: COLORS.textMuted }}>Statement of Attestation</div>
         <div className="text-sm leading-relaxed space-y-3" style={{ color: COLORS.text }}>
           <p>
-            I, <strong>{record.rank} {record.name}</strong> (Service No. <span className="font-mono">{record.serviceNumber}</span>), hereby declare and attest the following in respect of my <strong>{record.type}</strong> at STARLAB:
+            I, <strong>{record.rank} {record.name}</strong> (<span className="font-mono">{record.phoneNumber}</span>), hereby declare and attest the following in respect of my <strong>{record.type}</strong> at STARLAB:
           </p>
           <ol className="list-decimal pl-5 space-y-1.5 text-[13px]">
             <li>I have personally met with each respective Point of Contact (POC) listed in the checklist.</li>
@@ -658,9 +686,9 @@ function SubmittedScreen({ record, onHome }) {
 
       <div className="surface-shadow p-5 sm:p-6 space-y-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
         <DataRow label="Personnel" value={`${record.rank} ${record.name}`} />
-        <DataRow label="Service Number" value={record.serviceNumber} mono />
+        <DataRow label="Phone Number" value={record.phoneNumber} mono />
+        <DataRow label="Personal Email" value={record.email} />
         <DataRow label="Vocation" value={record.vocation} />
-        <DataRow label="Branch" value={record.branch} />
         <DataRow label="Process" value={record.type.toUpperCase()} />
         <DataRow label={record.type === "onboarding" ? "Reporting Date" : "Last Day"} value={record.keyDate} />
         <DataRow label="Items Completed" value={`${stats.done} / ${stats.total}`} />
@@ -809,7 +837,7 @@ function AdminScreen({ onView }) {
           const done = all.filter((it) => it.done).length;
           const pct = Math.round((done / all.length) * 100);
           return (
-            <button key={r.serviceNumber} onClick={() => onView(r)}
+            <button key={r.phoneNumber} onClick={() => onView(r)}
               className="w-full text-left p-4 surface-shadow flex items-center gap-4 hover:bg-white/[0.04] transition"
               style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
               <div className="shrink-0 w-1 self-stretch" style={{ background: r.submitted ? COLORS.success : r.type === "onboarding" ? COLORS.accent : COLORS.primary }} />
@@ -824,7 +852,7 @@ function AdminScreen({ onView }) {
                   )}
                 </div>
                 <div className="font-mono text-[11px] mt-1" style={{ color: COLORS.textMuted }}>
-                  {r.serviceNumber} · {r.vocation} · {r.branch} · {r.keyDate}
+                  {r.phoneNumber} · {r.email} · {r.vocation} · {r.keyDate}
                 </div>
               </div>
               <div className="text-right shrink-0">

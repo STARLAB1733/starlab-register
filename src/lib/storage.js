@@ -9,19 +9,19 @@ export async function saveRecord(record) {
     await fetch(API.save, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceNumber: record.serviceNumber, record: JSON.stringify(record) }),
+      body: JSON.stringify({ serviceNumber: record.phoneNumber, record: JSON.stringify(record) }),
     });
   } catch (e) {
     console.error("save failed", e);
   }
 }
 
-export async function loadRecord(serviceNumber) {
+export async function loadRecord(phoneNumber) {
   try {
     const res = await fetch(API.get, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceNumber }),
+      body: JSON.stringify({ serviceNumber: phoneNumber }),
     });
     const data = await res.json();
     return data.record ? JSON.parse(data.record) : null;
