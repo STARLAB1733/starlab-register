@@ -13,6 +13,16 @@ const validatePhone = (v) => {
   return /^(\+65)?[89]\d{7}$/.test(cleaned);
 };
 const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const validateDate = (v) => {
+  if (!v) return "Required";
+  const d = new Date(v);
+  const day = d.getDay();
+  if (day === 0 || day === 6) return "Must be a weekday (Mon–Fri)";
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  if (d > oneYearFromNow) return "Date must be within 1 year from today";
+  return null;
+};
 const normalisePhone = (v) => {
   const cleaned = v.replace(/\s/g, "");
   return cleaned.startsWith("+65") ? cleaned : `+65${cleaned}`;
@@ -31,7 +41,6 @@ const ONBOARDING = [
       { id: "s1-02", task: "Verify personal particulars (email, phone number, dob, address, nok)" },
       { id: "s1-03", task: "Collect camp pass / access card application" },
       { id: "s1-04", task: "Workspace Code of Conduct, Ethics and Policy" },
-      { id: "s1-05", task: "Medical records & PES update" },
       { id: "s1-08", task: "Facilities orientation tour (pantry, restrooms, fire exits, smoking points)" },
     ]
   },
@@ -39,10 +48,8 @@ const ONBOARDING = [
     key: "s2", category: "S2 — Security Officer",
     poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
     items: [
-      { id: "s2-01", task: "Security indoctrination briefing" },
+      { id: "s2-01", task: "Security indoctrination briefing (incl. OSA & NDA acknowledgment)" },
       { id: "s2-12", task: "Personnel Disciplinary Brief" },
-      { id: "s2-02", task: "Official Secrets Act (OSA) acknowledgment signed" },
-      { id: "s2-03", task: "Non-Disclosure Agreement signed" },
       { id: "s2-04", task: "MSD Security clearance level" },
       { id: "s2-05", task: "Classified information handling brief (marking / storage / transmission)" },
       { id: "s2-06", task: "Information management & data classification brief" },
@@ -70,8 +77,7 @@ const ONBOARDING = [
     items: [
       { id: "s4-01", task: "Laptop / workstation drawn (loan record signed)" },
       { id: "s4-02", task: "Peripherals drawn (monitor, keyboard, mouse, headset)" },
-      { id: "s4-03", task: "Office stationery starter pack" },
-      { id: "s4-04", task: "Locker & key assignment" },
+      { id: "s4-04", task: "Briefing of shared locker usage" },
       { id: "s4-05", task: "Uniform items (rank, name tag, unit patch) — regulars only" },
       { id: "s4-06", task: "Onboard office pass to security system" },
     ]
@@ -90,7 +96,7 @@ const ONBOARDING = [
     poc: "DPI POC / IT Support", icon: Server,
     items: [
       { id: "dpi-02", task: "Onboard defence mail" },
-      { id: "dpi-04", task: "Onboard to appropriate STARLAB Repository" },
+      { id: "dpi-04", task: "Onboard to STARLAB Repository (Optional)" },
       { id: "dpi-06", task: "Access to SharePoint, TeamSite and Telegram" },
       { id: "dpi-08", task: "Request OSN/SNET card (Optional)" },
     ]
@@ -101,7 +107,6 @@ const ONBOARDING = [
     items: [
       { id: "bh-01", task: "1-on-1 onboarding meeting (expectations, working style)" },
       { id: "bh-02", task: "30-day check-in scheduled" },
-      { id: "bh-03", task: "Initial-period objectives set" },
     ]
   },
 ];
@@ -340,7 +345,7 @@ function IdentifyScreen({ onContinue }) {
     else if (!validatePhone(phone)) e.phone = "Enter a valid SG mobile (+65XXXXXXXX or 8-digit starting with 8/9)";
     if (!email.trim()) e.email = "Required";
     else if (!validateEmail(email)) e.email = "Enter a valid email address";
-    if (!keyDate) e.keyDate = "Required";
+    const dateErr = validateDate(keyDate); if (dateErr) e.keyDate = dateErr;
     return e;
   };
 
