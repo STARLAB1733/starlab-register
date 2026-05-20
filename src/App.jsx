@@ -54,8 +54,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "s3", category: "S3 — Operations / Deputy Branch Head",
-    poc: "S3 Officer / Deputy Branch Head", icon: Briefcase,
+    key: "s3", category: "S3 — Operations Officer",
+    poc: "ME4 Ryan Tan", icon: Briefcase,
     items: [
       { id: "s3-01", task: "Branch structure & org chart walkthrough" },
       { id: "s3-02", task: "Role & responsibilities brief (job scope, KPIs)" },
@@ -67,8 +67,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "s4", category: "S4 — Logistics",
-    poc: "S4 Logistics Officer", icon: Package,
+    key: "s4", category: "S4 — Logistics Officer",
+    poc: "ME4 Claudia Chan", icon: Package,
     items: [
       { id: "s4-01", task: "Laptop / workstation drawn (loan record signed)" },
       { id: "s4-02", task: "Peripherals drawn (monitor, keyboard, mouse, headset)" },
@@ -80,7 +80,7 @@ const ONBOARDING = [
   },
   {
     key: "s6", category: "S6 — Training & Exercise",
-    poc: "S6 Training Officer", icon: GraduationCap,
+    poc: "ME5 Melvin Tan", icon: GraduationCap,
     items: [
       { id: "s6-01", task: "Training records verification" },
       { id: "s6-02", task: "IPPT scheduling (if applicable)" },
@@ -105,7 +105,7 @@ const ONBOARDING = [
   },
   {
     key: "bh", category: "Branch Head",
-    poc: "Branch Head", icon: UserCheck,
+    poc: "ME6 Lee Chen Yong", icon: UserCheck,
     items: [
       { id: "bh-01", task: "1-on-1 onboarding meeting (expectations, working style)" },
       { id: "bh-02", task: "30-day check-in scheduled" },
