@@ -744,6 +744,7 @@ function AdminScreen({ onView, onLogout }) {
   const [pwError, setPwError] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [records, setRecords] = useState(null);
+  const [recordsError, setRecordsError] = useState(null);
   const [filter, setFilter] = useState("all");
 
   const handleLogout = () => {
@@ -752,7 +753,13 @@ function AdminScreen({ onView, onLogout }) {
     onLogout?.();
   };
 
-  useEffect(() => { if (authed) listAllRecords().then((r) => setRecords(r || [])); }, [authed]);
+  useEffect(() => {
+    if (!authed) return;
+    setRecordsError(null);
+    listAllRecords()
+      .then((r) => setRecords(r || []))
+      .catch((e) => { setRecords([]); setRecordsError(e.message); });
+  }, [authed]);
 
   if (!authed) {
     const handleAuth = async (e) => {
@@ -869,9 +876,19 @@ function AdminScreen({ onView, onLogout }) {
         </div>
       )}
 
-      {records !== null && records.length === 0 && (
+      {recordsError && (
+        <div className="p-4 font-mono text-xs leading-relaxed" style={{ border: `1px solid #e05c5c`, color: "#e05c5c" }}>
+          <div className="uppercase tracking-widest font-semibold mb-1">Failed to load records</div>
+          <div style={{ color: COLORS.textMuted }}>{recordsError}</div>
+          <div className="mt-2" style={{ color: COLORS.textMuted }}>
+            Check that KV_REST_API_URL and KV_REST_API_TOKEN are set in Vercel → Settings → Environment Variables, then redeploy.
+          </div>
+        </div>
+      )}
+
+      {records !== null && !recordsError && records.length === 0 && (
         <div className="text-center py-16 font-mono text-xs uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
-          No records yet — start one from the Personnel view
+          No records yet — have personnel complete the identify step first
         </div>
       )}
 

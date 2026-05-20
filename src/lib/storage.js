@@ -31,14 +31,11 @@ export async function loadRecord(phoneNumber) {
 }
 
 export async function listAllRecords() {
-  try {
-    const res = await fetch(API.list, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await res.json();
-    return (data.records || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r));
-  } catch {
-    return [];
-  }
+  const res = await fetch(API.list, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || data.error || "Failed to load records");
+  return (data.records || []).map((r) => (typeof r === "string" ? JSON.parse(r) : r));
 }
