@@ -685,10 +685,66 @@ function DataRow({ label, value, mono = false }) {
 }
 
 function AdminScreen({ onView }) {
+  const [authed, setAuthed] = useState(() => sessionStorage.getItem("starlab_admin_auth") === "1");
+  const [pw, setPw] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
   const [records, setRecords] = useState(null);
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => { listAllRecords().then((r) => setRecords(r || [])); }, []);
+  useEffect(() => { if (authed) listAllRecords().then((r) => setRecords(r || [])); }, [authed]);
+
+  if (!authed) {
+    const handleAuth = async (e) => {
+      e.preventDefault();
+      setPwLoading(true);
+      setPwError("");
+      try {
+        const res = await fetch("/api/verify-admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pw }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          sessionStorage.setItem("starlab_admin_auth", "1");
+          setAuthed(true);
+        } else {
+          setPwError("Incorrect passphrase.");
+        }
+      } catch {
+        setPwError("Unable to verify — check your connection.");
+      } finally {
+        setPwLoading(false);
+      }
+    };
+    return (
+      <div className="max-w-sm mx-auto mt-16">
+        <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// S1 Admin Access</div>
+        <h1 className="font-display font-bold text-3xl uppercase tracking-wide mb-6">Enter Passphrase</h1>
+        <form onSubmit={handleAuth} className="space-y-4">
+          <input
+            type="password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            placeholder="Passphrase"
+            className="w-full px-4 py-3 font-mono text-sm bg-transparent outline-none"
+            style={{ border: `1px solid ${COLORS.border}`, color: COLORS.text }}
+            autoFocus
+          />
+          {pwError && <div className="font-mono text-xs" style={{ color: "#e05c5c" }}>{pwError}</div>}
+          <button
+            type="submit"
+            disabled={pwLoading || !pw}
+            className="w-full py-3 font-mono text-xs uppercase tracking-widest transition"
+            style={{ background: COLORS.primary, color: "#0d0d0d", opacity: pwLoading || !pw ? 0.5 : 1 }}
+          >
+            {pwLoading ? "Verifying…" : "Access Admin View"}
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   const filtered = useMemo(() => {
     if (!records) return [];
