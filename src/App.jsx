@@ -58,8 +58,6 @@ const ONBOARDING = [
     poc: "ME4 Ryan Tan", icon: Briefcase,
     items: [
       { id: "s3-01", task: "Branch structure & org chart walkthrough" },
-      { id: "s3-02", task: "Role & responsibilities brief (job scope, KPIs)" },
-      { id: "s3-03", task: "Project / work assignment received" },
       { id: "s3-04", task: "Team introductions completed" },
       { id: "s3-05", task: "SOPs & playbooks familiarized" },
       { id: "s3-06", task: "Current operations & priorities briefed" },
@@ -75,32 +73,26 @@ const ONBOARDING = [
       { id: "s4-03", task: "Office stationery starter pack" },
       { id: "s4-04", task: "Locker & key assignment" },
       { id: "s4-05", task: "Uniform items (rank, name tag, unit patch) — regulars only" },
-      { id: "s4-06", task: "Office key / door lock combination" },
+      { id: "s4-06", task: "Onboard office pass to security system" },
     ]
   },
   {
     key: "s6", category: "S6 — Training & Exercise",
     poc: "ME5 Melvin Tan", icon: GraduationCap,
     items: [
-      { id: "s6-01", task: "Training records verification" },
-      { id: "s6-02", task: "IPPT scheduling (if applicable)" },
-      { id: "s6-03", task: "Mandatory training enrollment (refresher / safety modules)" },
-      { id: "s6-04", task: "Vocation-specific training plan briefed" },
-      { id: "s6-05", task: "E-learning module assignments" },
-      { id: "s6-06", task: "Annual training calendar briefing" },
+      { id: "s6-01", task: "Onboard to STARQUEST2.0" },
+      { id: "s6-02", task: "Annual Training Calendar and Exercise Brief" },
+      { id: "s6-03", task: "Mandatory training enrollment" },
     ]
   },
   {
     key: "dpi", category: "DPI — Digital Infrastructure",
     poc: "DPI POC / IT Support", icon: Server,
     items: [
-      { id: "dpi-01", task: "Active Directory account created & first login successful" },
-      { id: "dpi-02", task: "Corporate email account setup" },
-      { id: "dpi-03", task: "SAF intranet / portal access" },
-      { id: "dpi-04", task: "Code repository access (Git / Bitbucket) — DigiSpecs & engineers" },
-      { id: "dpi-05", task: "Project management tools (Jira / Confluence)" },
-      { id: "dpi-06", task: "Shared drive / SharePoint access" },
-      { id: "dpi-07", task: "Printer setup" },
+      { id: "dpi-02", task: "Onboard defence mail" },
+      { id: "dpi-04", task: "Onboard to appropriate STARLAB Repository" },
+      { id: "dpi-06", task: "Access to SharePoint, TeamSite and Telegram" },
+      { id: "dpi-08", task: "Request OSN/SNET card (Optional)" },
     ]
   },
   {
