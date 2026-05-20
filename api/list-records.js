@@ -1,4 +1,4 @@
-import { kv } from "@vercel/kv";
+import { getRedis } from "./_redis.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -7,10 +7,11 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    const serviceNumbers = await kv.smembers("all_service_numbers");
+    const redis = getRedis();
+    const serviceNumbers = await redis.smembers("all_service_numbers");
     if (!serviceNumbers || !serviceNumbers.length) return res.status(200).json({ records: [] });
 
-    const records = await Promise.all(serviceNumbers.map((sn) => kv.get(`record:${sn}`)));
+    const records = await Promise.all(serviceNumbers.map((sn) => redis.get(`record:${sn}`)));
     res.status(200).json({ records: records.filter(Boolean) });
   } catch (err) {
     res.status(500).json({ error: "Failed to load records", detail: err.message });
