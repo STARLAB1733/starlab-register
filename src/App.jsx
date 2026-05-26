@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Shield, User, Briefcase, Package, GraduationCap, Server,
   UserCheck, Check, Lock, ChevronRight, ChevronLeft,
-  AlertCircle, Eye, ArrowLeft, ClipboardList, LogIn, Loader2
+  AlertCircle, ArrowLeft, ClipboardList, LogIn, Loader2
 } from "lucide-react";
 import { saveRecord, loadRecord, loadBothRecords, listAllRecords } from "./lib/storage";
 
@@ -1075,7 +1075,8 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
   const [pwLoading, setPwLoading] = useState(false);
   const [records, setRecords] = useState(null);
   const [recordsError, setRecordsError] = useState(null);
-  const [filter, setFilter] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterType, setFilterType] = useState("all");
 
   const handleLogout = () => {
     sessionStorage.removeItem("starlab_admin_auth");
@@ -1096,13 +1097,11 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
   const filtered = useMemo(() => {
     if (!records) return [];
     return records.filter((r) => {
-      if (filter === "onboarding") return r.type === "onboarding";
-      if (filter === "offboarding") return r.type === "offboarding";
-      if (filter === "submitted") return r.submitted;
-      if (filter === "inprogress") return !r.submitted;
-      return true;
+      const statusMatch = filterStatus === "all" || (filterStatus === "submitted" ? r.submitted : !r.submitted);
+      const typeMatch = filterType === "all" || r.type === filterType;
+      return statusMatch && typeMatch;
     }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [records, filter]);
+  }, [records, filterStatus, filterType]);
 
   if (!authed) {
     const handleAuth = async (e) => {
@@ -1186,22 +1185,31 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap mb-6">
-        {[
-          { v: "all", l: "All" },
-          { v: "onboarding", l: "Onboarding" },
-          { v: "offboarding", l: "Offboarding" },
-          { v: "inprogress", l: "In Progress" },
-          { v: "submitted", l: "Submitted" },
-        ].map((f) => (
-          <button key={f.v} onClick={() => setFilter(f.v)}
-            className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition"
-            style={{
-              background: filter === f.v ? COLORS.primary : "transparent",
-              color: filter === f.v ? "#0d0d0d" : COLORS.primary,
-              border: `1px solid ${COLORS.primary}`,
-            }}>{f.l}</button>
-        ))}
+      <div className="flex flex-col gap-2 mb-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-[9px] uppercase tracking-widest w-12 shrink-0" style={{ color: COLORS.textMuted }}>Status</span>
+          {[{ v: "all", l: "All" }, { v: "inprogress", l: "In Progress" }, { v: "submitted", l: "Submitted" }].map((f) => (
+            <button key={f.v} onClick={() => setFilterStatus(f.v)}
+              className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition"
+              style={{
+                background: filterStatus === f.v ? COLORS.primary : "transparent",
+                color: filterStatus === f.v ? "#0d0d0d" : COLORS.primary,
+                border: `1px solid ${COLORS.primary}`,
+              }}>{f.l}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-[9px] uppercase tracking-widest w-12 shrink-0" style={{ color: COLORS.textMuted }}>Type</span>
+          {[{ v: "all", l: "All" }, { v: "onboarding", l: "Onboarding" }, { v: "offboarding", l: "Offboarding" }].map((f) => (
+            <button key={f.v} onClick={() => setFilterType(f.v)}
+              className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition"
+              style={{
+                background: filterType === f.v ? COLORS.primary : "transparent",
+                color: filterType === f.v ? "#0d0d0d" : COLORS.primary,
+                border: `1px solid ${COLORS.primary}`,
+              }}>{f.l}</button>
+          ))}
+        </div>
       </div>
 
       {records === null && (
@@ -1259,7 +1267,6 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
                 <div className="font-display font-bold text-xl leading-none" style={{ color: COLORS.primary }}>{pct}%</div>
                 <div className="font-mono text-[10px] uppercase tracking-widest" style={{ color: COLORS.textMuted }}>{done}/{required.length}</div>
               </div>
-              <Eye size={16} className="shrink-0" style={{ color: COLORS.textMuted }} />
             </button>
           );
         })}
