@@ -521,6 +521,7 @@ function IdentifyScreen({ onContinue }) {
     else if (!validatePhone(phone)) e.phone = "Enter a valid SG mobile (8-digit starting with 8 or 9, or +65 prefix)";
     if (!email.trim()) e.email = "Required";
     else if (!validateEmail(email)) e.email = "Enter a valid email address";
+    if (vocation === "Other" && !vocOther.trim()) e.vocation = "Please specify your scheme";
     const dateErr = validateDate(keyDate);
     if (dateErr) e.keyDate = dateErr;
     return e;
@@ -674,11 +675,13 @@ function IdentifyScreen({ onContinue }) {
                 <option>Other</option>
               </select>
               {vocation === "Other" && (
-                <input type="text" value={vocOther} onChange={(e) => setVocOther(e.target.value)}
+                <input type="text" value={vocOther}
+                  onChange={(e) => { setVocOther(e.target.value); setErrors((err) => ({ ...err, vocation: undefined })); }}
                   placeholder="Specify Scheme"
                   className="w-full px-3 py-2.5 outline-none text-sm mt-2"
-                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }} />
+                  style={{ background: COLORS.bg, border: `1px solid ${errors.vocation ? "#e05c5c" : COLORS.border}`, color: COLORS.text }} />
               )}
+              {errors.vocation && <div className="font-mono text-[10px] mt-1" style={{ color: "#e05c5c" }}>{errors.vocation}</div>}
             </div>
             <Field label="Reporting Date" value={keyDate} onChange={(v) => { setKeyDate(v); setErrors((e) => ({ ...e, keyDate: undefined })); }} type="date" error={errors.keyDate} />
           </div>
