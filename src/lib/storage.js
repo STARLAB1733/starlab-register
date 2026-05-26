@@ -14,6 +14,10 @@ function patchRecord(record) {
   if (record.refNumber === undefined) record.refNumber = "";
   if (record.submitted === undefined) record.submitted = false;
   if (record.submittedAt === undefined) record.submittedAt = null;
+  if (record.approved === undefined) record.approved = false;
+  if (record.approvedAt === undefined) record.approvedAt = null;
+  if (record.rejected === undefined) record.rejected = false;
+  if (record.rejectionReason === undefined) record.rejectionReason = "";
   if (!record.email) record.email = "";
   if (!record.phoneNumber) record.phoneNumber = record.serviceNumber || "";
   if (!Array.isArray(record.sections)) record.sections = [];
@@ -64,6 +68,19 @@ export async function loadBothRecords(phoneNumber) {
     loadRecord(phoneNumber, "offboarding"),
   ]);
   return { onboarding, offboarding };
+}
+
+export async function approveRecord(phoneNumber, recordType, action, rejectionReason) {
+  const token = sessionStorage.getItem("starlab_admin_token") || "";
+  const res = await fetch("/api/approve-record", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ serviceNumber: phoneNumber, recordType, action, rejectionReason: rejectionReason || "", token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update record");
+  const parsed = typeof data.record === "string" ? JSON.parse(data.record) : data.record;
+  return patchRecord(parsed);
 }
 
 export async function listAllRecords() {

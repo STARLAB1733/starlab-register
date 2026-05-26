@@ -20,5 +20,9 @@ export default async function handler(req, res) {
     stored.length === provided.length &&
     crypto.timingSafeEqual(stored, provided);
 
-  res.status(200).json({ ok: match });
+  if (match) {
+    const token = crypto.createHmac("sha256", process.env.ADMIN_PASSWORD).update("starlab-admin-session").digest("hex");
+    return res.status(200).json({ ok: true, token });
+  }
+  res.status(200).json({ ok: false });
 }

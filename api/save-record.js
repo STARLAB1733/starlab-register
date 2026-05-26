@@ -36,12 +36,19 @@ export default async function handler(req, res) {
 
     const redis = getRedis();
 
-    // Lock check — only adminComment may change on submitted records
+    // Lock check — protect submitted and approved records
     const existing = await redis.get(key);
     if (existing) {
       let existingParsed;
       try { existingParsed = JSON.parse(existing); } catch { /* ignore */ }
-      if (existingParsed?.submitted) {
+
+      if (existingParsed?.approved) {
+        // Fully locked after S1 approval — no further changes allowed
+        return res.status(403).json({ error: "Record has been approved and cannot be modified" });
+      }
+
+      if (existingParsed?.submitted && !existingParsed?.rejected) {
+        // Pending S1 approval — lock all fields except adminComment
         parsed.sections = existingParsed.sections;
         parsed.submitted = true;
         parsed.submittedAt = existingParsed.submittedAt;
@@ -49,6 +56,15 @@ export default async function handler(req, res) {
         parsed.declarationPhone = existingParsed.declarationPhone;
         parsed.declarationEmail = existingParsed.declarationEmail;
         parsed.refNumber = existingParsed.refNumber;
+        parsed.approved = false;
+        parsed.approvedAt = null;
+        parsed.rejected = false;
+        parsed.rejectionReason = "";
+      } else if (existingParsed?.submitted && existingParsed?.rejected) {
+        // Rejected — allow new declaration but keep sections and approval state locked
+        parsed.sections = existingParsed.sections;
+        parsed.approved = false;
+        parsed.approvedAt = null;
       }
     }
 

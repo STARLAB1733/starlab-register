@@ -4,7 +4,7 @@ import {
   UserCheck, Check, Lock, ChevronRight, ChevronLeft,
   AlertCircle, ArrowLeft, ClipboardList, LogIn, Loader2
 } from "lucide-react";
-import { saveRecord, loadRecord, loadBothRecords, listAllRecords } from "./lib/storage";
+import { saveRecord, loadRecord, loadBothRecords, listAllRecords, approveRecord } from "./lib/storage";
 
 // ============================================================
 // VALIDATION HELPERS
@@ -340,6 +340,10 @@ export default function App() {
             saveStatus={saveStatus}
             onCommentChange={updateAdminComment}
             onSubmit={() => setView("declaration")}
+            onApprove={adminMode ? async (action, reason) => {
+              const updated = await approveRecord(record.phoneNumber, record.type, action, reason);
+              setRecord(updated);
+            } : undefined}
             onBack={adminMode
               ? () => leaveChecklist(() => { setView("admin"); })
               : () => leaveChecklist(() => { setView("identify"); setRecord(null); })
@@ -357,6 +361,7 @@ export default function App() {
           <SubmittedScreen
             record={record}
             isAdmin={adminMode}
+            onResign={!adminMode && record.rejected ? () => setView("declaration") : undefined}
             onHome={adminMode
               ? () => { setView("admin"); }
               : () => { setView("identify"); setRecord(null); }
@@ -716,7 +721,7 @@ function IdentifyScreen({ onContinue }) {
       )}
 
       <div className="mt-6 p-4 font-mono text-xs leading-relaxed" style={{ border: `1px dashed ${COLORS.border}`, color: COLORS.textMuted }}>
-        <span className="uppercase font-semibold" style={{ color: COLORS.primary }}>Note:</span> Complete each item in person with the responsible POC. Once all required items are ticked, you will sign a declaration attesting that each briefing was personally received.
+        <span className="uppercase font-semibold" style={{ color: COLORS.primary }}>Note:</span> Complete each item in person with the responsible POC. Once all required items are ticked, you will sign a declaration attesting that each briefing was personally received. Your submission will then require S1 approval before it is considered cleared.
       </div>
     </div>
   );
@@ -734,7 +739,93 @@ function Field({ label, value, onChange, placeholder, type = "text", mono = fals
   );
 }
 
-function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false, onCommentChange, saveStatus }) {
+function ApprovalPanel({ record, onApprove }) {
+  const [rejectReason, setRejectReason] = useState("");
+  const [showReject, setShowReject] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handle = async (action) => {
+    if (action === "reject" && !rejectReason.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      await onApprove(action, rejectReason.trim());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (record.approved) {
+    return (
+      <div className="p-4" style={{ border: `1px solid ${COLORS.success}`, background: "#0a1f12" }}>
+        <div className="font-mono text-[11px] uppercase tracking-widest mb-1 flex items-center gap-2" style={{ color: COLORS.success }}>
+          <Check size={12} /> Approved by S1
+        </div>
+        <div className="font-mono text-[10px]" style={{ color: COLORS.textMuted }}>
+          {new Date(record.approvedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })}
+        </div>
+      </div>
+    );
+  }
+
+  if (record.rejected) {
+    return (
+      <div className="p-4" style={{ border: `1px solid #e05c5c`, background: "#1f0a0a" }}>
+        <div className="font-mono text-[11px] uppercase tracking-widest mb-1" style={{ color: "#e05c5c" }}>Rejected — awaiting re-submission</div>
+        <div className="text-sm mt-1" style={{ color: COLORS.textMuted }}>{record.rejectionReason}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-3" style={{ border: `1px solid #d97706`, background: "#1a1200" }}>
+      <div className="font-mono text-[11px] uppercase tracking-widest" style={{ color: "#d97706" }}>Pending S1 Approval</div>
+      {error && <div className="font-mono text-[10px]" style={{ color: "#e05c5c" }}>{error}</div>}
+      {showReject ? (
+        <div className="space-y-2">
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="State the reason for rejection (required)…"
+            rows={3}
+            className="w-full px-3 py-2 outline-none text-sm font-body resize-none"
+            style={{ background: COLORS.bg, border: `1px solid #e05c5c`, color: COLORS.text }}
+          />
+          <div className="flex gap-2">
+            <button onClick={() => handle("reject")} disabled={loading || !rejectReason.trim()}
+              className="flex-1 py-2.5 font-mono text-[11px] uppercase tracking-widest transition disabled:opacity-40"
+              style={{ background: "#e05c5c", color: "#fff" }}>
+              {loading ? "Rejecting…" : "Confirm Reject"}
+            </button>
+            <button onClick={() => { setShowReject(false); setRejectReason(""); }}
+              className="px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest transition hover:opacity-70"
+              style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={() => handle("approve")} disabled={loading}
+            className="flex-1 py-2.5 font-mono text-[11px] uppercase tracking-widest transition disabled:opacity-40"
+            style={{ background: COLORS.success, color: "#fff" }}>
+            {loading ? "Approving…" : "Approve"}
+          </button>
+          <button onClick={() => setShowReject(true)} disabled={loading}
+            className="flex-1 py-2.5 font-mono text-[11px] uppercase tracking-widest transition disabled:opacity-40"
+            style={{ border: `1px solid #e05c5c`, color: "#e05c5c" }}>
+            Reject
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false, onCommentChange, onApprove, saveStatus }) {
   const [openSection, setOpenSection] = useState(record.sections[0]?.key);
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
@@ -821,21 +912,25 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
       </div>
 
       {isAdmin ? (
-        <div className="mt-8 pt-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
-          <div className="font-mono text-[11px] uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: COLORS.accent }}>
-            <UserCheck size={13} /> S1 Admin Comments
+        <div className="mt-8 pt-6 space-y-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
+          <div>
+            <div className="font-mono text-[11px] uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: COLORS.accent }}>
+              <UserCheck size={13} /> S1 Admin Comments
+            </div>
+            <textarea
+              value={record.adminComment || ""}
+              onChange={(e) => { if (e.target.value.length <= 2000) onCommentChange?.(e.target.value); }}
+              placeholder="Add remarks, follow-up actions, or clearance notes for this personnel record…"
+              className="w-full px-3 py-3 outline-none text-sm font-body resize-none"
+              style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.text, minHeight: "100px" }}
+            />
+            <div className="font-mono text-[10px] mt-1.5 uppercase tracking-widest flex justify-between" style={{ color: COLORS.textMuted }}>
+              <span>Saved automatically · visible to personnel</span>
+              <span>{(record.adminComment || "").length}/2000</span>
+            </div>
           </div>
-          <textarea
-            value={record.adminComment || ""}
-            onChange={(e) => { if (e.target.value.length <= 2000) onCommentChange?.(e.target.value); }}
-            placeholder="Add remarks, follow-up actions, or clearance notes for this personnel record…"
-            className="w-full px-3 py-3 outline-none text-sm font-body resize-none"
-            style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.text, minHeight: "100px" }}
-          />
-          <div className="font-mono text-[10px] mt-1.5 uppercase tracking-widest flex justify-between" style={{ color: COLORS.textMuted }}>
-            <span>Saved automatically · visible to personnel</span>
-            <span>{(record.adminComment || "").length}/2000</span>
-          </div>
+
+          {record.submitted && onApprove && <ApprovalPanel record={record} onApprove={onApprove} />}
         </div>
       ) : (
         <div className="mt-8 pt-6" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
@@ -919,7 +1014,13 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
     if (!canSubmit) return;
     const submittedAt = new Date().toISOString();
     const refNumber = generateRefNumber(record.phoneNumber, submittedAt);
-    setRecord((r) => ({ ...r, submitted: true, submittedAt, declarationName: typedName.trim(), declarationPhone: record.phoneNumber, refNumber }));
+    setRecord((r) => ({
+      ...r,
+      submitted: true, submittedAt,
+      declarationName: typedName.trim(), declarationPhone: record.phoneNumber, refNumber,
+      rejected: false, rejectionReason: "",
+      approved: false, approvedAt: null,
+    }));
     onSign();
   };
 
@@ -930,7 +1031,15 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
       </button>
 
       <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// Step 3 of 3 — Declaration</div>
-      <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none mb-6">Personnel Declaration</h1>
+      <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none mb-4">Personnel Declaration</h1>
+
+      {record.rejected && (
+        <div className="mb-6 p-4" style={{ border: `1px solid #e05c5c`, background: "#1f0a0a" }}>
+          <div className="font-mono text-[11px] uppercase tracking-widest mb-1" style={{ color: "#e05c5c" }}>Previous submission rejected by S1</div>
+          <div className="text-sm" style={{ color: COLORS.textMuted }}>{record.rejectionReason}</div>
+          <div className="font-mono text-[10px] mt-2" style={{ color: COLORS.textMuted }}>Re-sign below to resubmit for S1 approval.</div>
+        </div>
+      )}
 
       <div className="surface-shadow p-5 sm:p-7" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
         <div className="font-mono text-[11px] uppercase tracking-widest mb-3" style={{ color: COLORS.textMuted }}>Statement of Attestation</div>
@@ -994,40 +1103,66 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
         </button>
 
         <div className="mt-4 font-mono text-[10px] uppercase tracking-widest text-center" style={{ color: COLORS.textMuted }}>
-          Once submitted, this record will be locked and cannot be modified.
+          {record.rejected ? "Re-signing clears the rejection and resubmits for S1 approval." : "Once submitted, your declaration is locked pending S1 approval."}
         </div>
       </div>
     </div>
   );
 }
 
-function SubmittedScreen({ record, onHome, isAdmin = false }) {
+function SubmittedScreen({ record, onHome, onResign, isAdmin = false }) {
   const stats = useMemo(() => {
     const all = record.sections.flatMap((s) => s.items);
     const required = all.filter((it) => !isOptionalItem(it.task));
     return { total: required.length, done: required.filter((it) => it.done).length };
   }, [record]);
 
+  const isApproved = record.approved;
+  const isRejected = record.rejected;
+  const isPending = record.submitted && !isApproved && !isRejected;
+
+  const headerBorderColor = isApproved ? COLORS.success : isRejected ? "#e05c5c" : "#d97706";
+  const headerBg = isApproved ? "#0a1f12" : isRejected ? "#1f0a0a" : "#1a1200";
+
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="relative p-6 sm:p-8 mb-6 text-center" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
-        <div className="inline-flex items-center justify-center w-14 h-14 mb-4 stamp-border" style={{ background: COLORS.primary }}>
+      <div className="relative p-6 sm:p-8 mb-6 text-center" style={{ background: headerBg, border: `1px solid ${headerBorderColor}` }}>
+        <div className="inline-flex items-center justify-center w-14 h-14 mb-4"
+          style={{ background: headerBorderColor, boxShadow: `0 0 0 4px #0d0d0d, 0 0 0 5px ${headerBorderColor}` }}>
           <Check size={28} color="white" strokeWidth={3} />
         </div>
-        <div className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>Submitted & Locked</div>
-        <h1 className="font-display font-bold text-2xl sm:text-3xl uppercase tracking-wide leading-none mb-3">Declaration Recorded</h1>
+        <div className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: headerBorderColor }}>
+          {isApproved ? "Approved by S1" : isRejected ? "Rejected by S1" : "Awaiting S1 Approval"}
+        </div>
+        <h1 className="font-display font-bold text-2xl sm:text-3xl uppercase tracking-wide leading-none mb-3">
+          {isApproved ? `${record.type === "onboarding" ? "Onboarding" : "Offboarding"} Complete` : isRejected ? "Submission Rejected" : "Declaration Submitted"}
+        </h1>
         <p className="text-sm" style={{ color: COLORS.textMuted }}>
-          {isAdmin
-            ? `${record.type.charAt(0).toUpperCase() + record.type.slice(1)} declaration submitted and locked. Use the checklist view to update items or add remarks.`
-            : `Your ${record.type} checklist and signed declaration have been recorded. Please retain a screenshot for your own reference.`}
+          {isApproved && !isAdmin && `Your ${record.type} has been approved by S1. Retain the reference number below.`}
+          {isApproved && isAdmin && `S1 approved on ${new Date(record.approvedAt).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}.`}
+          {isRejected && !isAdmin && "Your declaration was not approved. See the reason below and re-sign to resubmit."}
+          {isRejected && isAdmin && "Declaration rejected — personnel must re-sign before S1 can approve."}
+          {isPending && !isAdmin && "Your declaration has been recorded and is awaiting S1 approval. You will be notified once cleared."}
+          {isPending && isAdmin && "Declaration submitted and pending S1 approval. Open the checklist view to approve or reject."}
         </p>
       </div>
 
-      {record.refNumber && (
-        <div className="mb-4 px-5 py-4 text-center" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
-          <div className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: COLORS.textMuted }}>Declaration Reference</div>
-          <div className="font-mono font-bold text-2xl tracking-widest" style={{ color: COLORS.primary }}>{record.refNumber}</div>
-          <div className="font-mono text-[10px] mt-1" style={{ color: COLORS.textMuted }}>Screenshot this for your records</div>
+      {isRejected && (
+        <div className="mb-4 p-4" style={{ background: COLORS.surface, border: `1px solid #e05c5c` }}>
+          <div className="font-mono text-[11px] uppercase tracking-widest mb-1" style={{ color: "#e05c5c" }}>Rejection Reason</div>
+          <p className="text-sm leading-relaxed" style={{ color: COLORS.text }}>{record.rejectionReason}</p>
+        </div>
+      )}
+
+      {(isApproved || isPending) && record.refNumber && (
+        <div className="mb-4 px-5 py-4 text-center" style={{ background: COLORS.surface, border: `1px solid ${isApproved ? COLORS.success : "#d97706"}` }}>
+          <div className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: COLORS.textMuted }}>
+            {isApproved ? "Approved Reference" : "Pending Reference"}
+          </div>
+          <div className="font-mono font-bold text-2xl tracking-widest" style={{ color: isApproved ? COLORS.success : "#d97706" }}>{record.refNumber}</div>
+          <div className="font-mono text-[10px] mt-1" style={{ color: COLORS.textMuted }}>
+            {isApproved ? "Screenshot this as proof of clearance" : "Reference pending — screenshot once approved"}
+          </div>
         </div>
       )}
 
@@ -1041,6 +1176,7 @@ function SubmittedScreen({ record, onHome, isAdmin = false }) {
         <DataRow label="Signed As" value={record.declarationName} />
         <DataRow label="Signed Phone" value={record.declarationPhone || record.phoneNumber} mono />
         <DataRow label="Submitted On" value={new Date(record.submittedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })} />
+        {isApproved && <DataRow label="Approved On" value={new Date(record.approvedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })} />}
       </div>
 
       {record.adminComment && (
@@ -1052,7 +1188,14 @@ function SubmittedScreen({ record, onHome, isAdmin = false }) {
         </div>
       )}
 
-      <button onClick={onHome} className="mt-6 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
+      {isRejected && !isAdmin && onResign && (
+        <button onClick={onResign} className="mt-6 w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm transition"
+          style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+          Re-sign Declaration
+        </button>
+      )}
+      <button onClick={onHome} className="mt-3 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80"
+        style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
         {isAdmin ? "Back to Register" : "Return to Start"}
       </button>
     </div>
@@ -1080,6 +1223,7 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
 
   const handleLogout = () => {
     sessionStorage.removeItem("starlab_admin_auth");
+    sessionStorage.removeItem("starlab_admin_token");
     setAuthed(false);
     onLogout?.();
   };
@@ -1097,7 +1241,12 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
   const filtered = useMemo(() => {
     if (!records) return [];
     return records.filter((r) => {
-      const statusMatch = filterStatus === "all" || (filterStatus === "submitted" ? r.submitted : !r.submitted);
+      const statusMatch =
+        filterStatus === "all" ||
+        (filterStatus === "inprogress" && !r.submitted) ||
+        (filterStatus === "pending" && r.submitted && !r.approved && !r.rejected) ||
+        (filterStatus === "approved" && r.approved) ||
+        (filterStatus === "rejected" && r.rejected);
       const typeMatch = filterType === "all" || r.type === filterType;
       return statusMatch && typeMatch;
     }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -1117,6 +1266,7 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
         const data = await res.json();
         if (data.ok) {
           sessionStorage.setItem("starlab_admin_auth", "1");
+          sessionStorage.setItem("starlab_admin_token", data.token || "");
           setAuthed(true);
         } else {
           setPwError("Incorrect passphrase.");
@@ -1188,7 +1338,7 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
       <div className="flex flex-col gap-2 mb-6">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-[9px] uppercase tracking-widest w-12 shrink-0" style={{ color: COLORS.textMuted }}>Status</span>
-          {[{ v: "all", l: "All" }, { v: "inprogress", l: "In Progress" }, { v: "submitted", l: "Submitted" }].map((f) => (
+          {[{ v: "all", l: "All" }, { v: "inprogress", l: "In Progress" }, { v: "pending", l: "Pending" }, { v: "approved", l: "Approved" }, { v: "rejected", l: "Rejected" }].map((f) => (
             <button key={f.v} onClick={() => setFilterStatus(f.v)}
               className="font-mono text-[10px] uppercase tracking-widest px-3 py-2 transition"
               style={{
@@ -1242,18 +1392,26 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
           const done = required.filter((it) => it.done).length;
           const pct = required.length ? Math.round((done / required.length) * 100) : 100;
           const typeBg = r.type === "onboarding" ? COLORS.onboarding : COLORS.offboarding;
+          const stripeColor = r.approved ? COLORS.success : r.rejected ? "#e05c5c" : r.submitted ? "#d97706" : COLORS.primary;
+          const statusBadge = r.approved
+            ? { label: "Approved", bg: COLORS.success }
+            : r.rejected
+            ? { label: "Rejected", bg: "#e05c5c" }
+            : r.submitted
+            ? { label: "Pending", bg: "#d97706" }
+            : null;
           return (
-            <button key={r.phoneNumber} onClick={() => onView(r)}
+            <button key={`${r.type}-${r.phoneNumber}`} onClick={() => onView(r)}
               className="w-full text-left p-4 surface-shadow flex items-center gap-4 hover:bg-white/[0.04] transition"
               style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-              <div className="shrink-0 w-1 self-stretch" style={{ background: r.submitted ? COLORS.success : COLORS.primary }} />
+              <div className="shrink-0 w-1 self-stretch" style={{ background: stripeColor }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-display font-bold text-base uppercase tracking-wide">{r.rank} {r.name}</span>
                   <span className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5" style={{ background: typeBg, color: "white" }}>{r.type}</span>
-                  {r.submitted && (
+                  {statusBadge && (
                     <span className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5 inline-flex items-center gap-1"
-                      style={{ background: COLORS.success, color: "white" }}><Lock size={9} /> Signed</span>
+                      style={{ background: statusBadge.bg, color: "white" }}><Lock size={9} /> {statusBadge.label}</span>
                   )}
                 </div>
                 <div className="font-mono text-[11px] mt-1 truncate" style={{ color: COLORS.textMuted }}>
