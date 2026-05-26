@@ -10,6 +10,8 @@ function patchRecord(record) {
   if (record.adminComment === undefined) record.adminComment = "";
   if (record.declarationName === undefined) record.declarationName = "";
   if (record.declarationEmail === undefined) record.declarationEmail = "";
+  if (record.declarationPhone === undefined) record.declarationPhone = "";
+  if (record.refNumber === undefined) record.refNumber = "";
   if (record.submitted === undefined) record.submitted = false;
   if (record.submittedAt === undefined) record.submittedAt = null;
   if (!record.email) record.email = "";
@@ -38,12 +40,12 @@ export async function saveRecord(record) {
   }
 }
 
-export async function loadRecord(phoneNumber) {
+export async function loadRecord(phoneNumber, recordType) {
   try {
     const res = await fetch(API.get, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceNumber: phoneNumber }),
+      body: JSON.stringify({ serviceNumber: phoneNumber, recordType }),
     });
     const data = await res.json();
     if (!data.record) return null;
@@ -52,6 +54,16 @@ export async function loadRecord(phoneNumber) {
   } catch {
     return null;
   }
+}
+
+// Looks up both onboarding and offboarding records for a phone number.
+// Returns { onboarding, offboarding } — either may be null.
+export async function loadBothRecords(phoneNumber) {
+  const [onboarding, offboarding] = await Promise.all([
+    loadRecord(phoneNumber, "onboarding"),
+    loadRecord(phoneNumber, "offboarding"),
+  ]);
+  return { onboarding, offboarding };
 }
 
 export async function listAllRecords() {

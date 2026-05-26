@@ -4,7 +4,7 @@ import {
   UserCheck, Check, Lock, ChevronRight, ChevronLeft,
   AlertCircle, Eye, ArrowLeft, ClipboardList, LogIn, Loader2
 } from "lucide-react";
-import { saveRecord, loadRecord, listAllRecords } from "./lib/storage";
+import { saveRecord, loadRecord, loadBothRecords, listAllRecords } from "./lib/storage";
 
 // ============================================================
 // VALIDATION HELPERS
@@ -97,9 +97,9 @@ const ONBOARDING = [
     key: "dpi", category: "DPI — Digital Infrastructure",
     poc: "ME4 Wong Jiong Yu", icon: Server,
     items: [
+      { id: "dpi-06", task: "Access to SharePoint, TeamSite and Telegram" },
       { id: "dpi-02", task: "Onboard defence mail (Optional)" },
       { id: "dpi-04", task: "Onboard to STARLAB Repository (Optional)" },
-      { id: "dpi-06", task: "Access to SharePoint, TeamSite and Telegram" },
       { id: "dpi-08", task: "Request OSN/SNET card (Optional)" },
       { id: "dpi-09", task: "Issue of JPE Token and Account Onboarding (Optional)" },
     ]
@@ -234,6 +234,47 @@ const COLORS = {
 };
 
 const isOptionalItem = (task) => task.includes("(Optional)");
+
+// Deterministic reference number — STL-YYYYMMDD-XXXX
+// Derived from phone digits + submission timestamp so it can be reproduced from the record.
+function generateRefNumber(phoneNumber, submittedAt) {
+  const digits = phoneNumber.replace(/\D/g, "");
+  const ts = new Date(submittedAt).getTime();
+  const seed = (parseInt(digits.slice(-4), 10) * 99991 + (ts % 100000)) % 1679616; // 36^4
+  const code = seed.toString(36).toUpperCase().padStart(4, "0");
+  const date = submittedAt.slice(0, 10).replace(/-/g, "");
+  return `STL-${date}-${code}`;
+}
+
+// Sync a loaded record's sections against the current checklist definition.
+// - Preserves done/doneAt/notes for items that still exist (matched by id)
+// - Drops items removed from the definition
+// - Adds new items with done:false
+// - Updates task text if an item was renamed
+function reconcileRecord(record) {
+  const definition = record.type === "onboarding" ? ONBOARDING : OFFBOARDING;
+  const sectionMap = Object.fromEntries((record.sections || []).map((s) => [s.key, s]));
+  record.sections = definition.map((def) => {
+    const stored = sectionMap[def.key];
+    const itemMap = Object.fromEntries((stored?.items || []).map((it) => [it.id, it]));
+    return {
+      key: def.key,
+      category: def.category,
+      poc: def.poc,
+      items: def.items.map((defItem) => {
+        const existing = itemMap[defItem.id];
+        return {
+          id: defItem.id,
+          task: defItem.task, // always use current definition text
+          done: existing?.done ?? false,
+          doneAt: existing?.doneAt ?? null,
+          notes: existing?.notes ?? "",
+        };
+      }),
+    };
+  });
+  return record;
+}
 
 // ============================================================
 // APP
@@ -372,8 +413,14 @@ function IdentifyScreen({ onContinue }) {
   const [retPhone, setRetPhone] = useState("");
   const [retPhoneError, setRetPhoneError] = useState("");
   const [retLoading, setRetLoading] = useState(false);
-  const [foundRecord, setFoundRecord] = useState(null);
+  const [foundRecords, setFoundRecords] = useState(null); // { onboarding, offboarding }
   const [notFound, setNotFound] = useState(false);
+
+  // Offboarding simplified form state
+  const [offPhone, setOffPhone] = useState("");
+  const [offKeyDate, setOffKeyDate] = useState("");
+  const [offErrors, setOffErrors] = useState({});
+  const [offLoading, setOffLoading] = useState(false);
 
   // New user state
   const [type, setType] = useState("onboarding");
@@ -381,31 +428,41 @@ function IdentifyScreen({ onContinue }) {
   const [rank, setRank] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [vocation, setVocation] = useState("Regular (C4X)");
+  const [vocation, setVocation] = useState("Regular (C4X/DCX)");
+  const [vocOther, setVocOther] = useState("");
   const [keyDate, setKeyDate] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const switchMode = (m) => {
     setMode(m);
-    setFoundRecord(null);
+    setFoundRecords(null);
     setNotFound(false);
     setRetPhoneError("");
     setErrors({});
+    setOffErrors({});
   };
 
-  // ── Returning: phone lookup ──
+  // ── Returning: phone lookup (both record types) ──
   const handleLookup = async () => {
     if (!retPhone.trim()) { setRetPhoneError("Required"); return; }
     if (!validatePhone(retPhone)) { setRetPhoneError("Enter a valid SG mobile (8-digit starting with 8 or 9, or +65 prefix)"); return; }
     setRetPhoneError("");
     setRetLoading(true);
     setNotFound(false);
-    setFoundRecord(null);
+    setFoundRecords(null);
     try {
       const key = normalisePhone(retPhone.trim());
-      const existing = await loadRecord(key);
-      if (existing) { setFoundRecord(existing); } else { setNotFound(true); }
+      const both = await loadBothRecords(key);
+      const hasAny = both.onboarding || both.offboarding;
+      if (hasAny) {
+        setFoundRecords({
+          onboarding: both.onboarding ? reconcileRecord(both.onboarding) : null,
+          offboarding: both.offboarding ? reconcileRecord(both.offboarding) : null,
+        });
+      } else {
+        setNotFound(true);
+      }
     } catch {
       setRetPhoneError("Connection error. Please try again.");
     } finally {
@@ -413,7 +470,45 @@ function IdentifyScreen({ onContinue }) {
     }
   };
 
-  // ── New user: full form ──
+  // ── Offboarding new personnel: phone + last day only ──
+  const handleOffboardContinue = async () => {
+    const e = {};
+    if (!offPhone.trim()) e.offPhone = "Required";
+    else if (!validatePhone(offPhone)) e.offPhone = "Enter a valid SG mobile (8-digit starting with 8 or 9, or +65 prefix)";
+    const dateErr = validateDate(offKeyDate);
+    if (dateErr) e.offKeyDate = dateErr;
+    setOffErrors(e);
+    if (Object.keys(e).length > 0) return;
+    setOffLoading(true);
+    try {
+      const key = normalisePhone(offPhone.trim());
+      const existingOff = await loadRecord(key, "offboarding");
+      if (existingOff) { onContinue(reconcileRecord(existingOff)); return; }
+      const onboarding = await loadRecord(key, "onboarding");
+      if (!onboarding) {
+        setOffErrors({ offPhone: "No onboarding record found for this number. Personnel must complete onboarding first." });
+        return;
+      }
+      const sections = OFFBOARDING.map((s) => ({
+        key: s.key, category: s.category, poc: s.poc,
+        items: s.items.map((it) => ({ ...it, done: false, doneAt: null, notes: "" }))
+      }));
+      onContinue({
+        phoneNumber: key, email: onboarding.email,
+        name: onboarding.name, rank: onboarding.rank, vocation: onboarding.vocation,
+        keyDate: offKeyDate, type: "offboarding", sections,
+        createdAt: new Date().toISOString(),
+        submitted: false, submittedAt: null,
+        declarationName: "", declarationPhone: "", refNumber: "", adminComment: "",
+      });
+    } catch {
+      setOffErrors({ _: "Connection error. Please try again." });
+    } finally {
+      setOffLoading(false);
+    }
+  };
+
+  // ── New user onboarding: full form ──
   const validate = () => {
     const e = {};
     if (!name.trim()) e.name = "Required";
@@ -434,19 +529,20 @@ function IdentifyScreen({ onContinue }) {
     setLoading(true);
     try {
       const key = normalisePhone(phone.trim());
-      const existing = await loadRecord(key);
-      if (existing) { onContinue(existing); return; }
-      const sections = (type === "onboarding" ? ONBOARDING : OFFBOARDING).map((s) => ({
+      const existing = await loadRecord(key, "onboarding");
+      if (existing) { onContinue(reconcileRecord(existing)); return; }
+      const sections = ONBOARDING.map((s) => ({
         key: s.key, category: s.category, poc: s.poc,
         items: s.items.map((it) => ({ ...it, done: false, doneAt: null, notes: "" }))
       }));
       onContinue({
         phoneNumber: key, email: email.trim().toLowerCase(),
         name: name.trim(), rank: rank.trim(),
-        vocation, keyDate, type, sections,
+        vocation: vocation === "Other" ? (vocOther.trim() || "Other") : vocation,
+        keyDate, type: "onboarding", sections,
         createdAt: new Date().toISOString(),
         submitted: false, submittedAt: null,
-        declarationName: "", declarationEmail: "", adminComment: "",
+        declarationName: "", declarationPhone: "", refNumber: "", adminComment: "",
       });
     } catch {
       setErrors({ _: "Connection error. Please try again." });
@@ -476,7 +572,7 @@ function IdentifyScreen({ onContinue }) {
       {/* ── RETURNING USER ── */}
       {mode === "returning" && (
         <div className="space-y-4">
-          {!foundRecord ? (
+          {!foundRecords ? (
             <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
               <p className="text-sm" style={{ color: COLORS.textMuted }}>
                 Enter your registered phone number to retrieve your record and pick up where you left off.
@@ -498,22 +594,29 @@ function IdentifyScreen({ onContinue }) {
               </button>
             </div>
           ) : (
-            <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
-              <div className="font-mono text-[11px] uppercase tracking-widest" style={{ color: COLORS.accent }}>// Record Found</div>
-              <div className="space-y-1">
-                <DataRow label="Name" value={`${foundRecord.rank} ${foundRecord.name}`} />
-                <DataRow label="Phone" value={foundRecord.phoneNumber} mono />
-                <DataRow label="Vocation" value={foundRecord.vocation} />
-                <DataRow label="Process" value={foundRecord.type.toUpperCase()} />
-                <DataRow label={foundRecord.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(foundRecord.keyDate)} />
-                <DataRow label="Status" value={foundRecord.submitted ? "Submitted & Locked" : "In Progress"} />
-              </div>
-              <button onClick={() => onContinue(foundRecord)}
-                className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
-                style={{ background: COLORS.primary, color: "#0d0d0d" }}>
-                <LogIn size={16} /> Resume Checklist
-              </button>
-              <button onClick={() => { setFoundRecord(null); setRetPhone(""); }}
+            <div className="space-y-3">
+              <div className="font-mono text-[11px] uppercase tracking-widest px-1" style={{ color: COLORS.accent }}>// Records Found — select one to resume</div>
+              {["onboarding", "offboarding"].map((t) => {
+                const rec = foundRecords[t];
+                if (!rec) return null;
+                return (
+                  <div key={t} className="surface-shadow p-5 space-y-3" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
+                    <div className="space-y-1">
+                      <DataRow label="Name" value={`${rec.rank} ${rec.name}`} />
+                      <DataRow label="Phone" value={rec.phoneNumber} mono />
+                      <DataRow label="Process" value={rec.type.toUpperCase()} />
+                      <DataRow label={rec.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(rec.keyDate)} />
+                      <DataRow label="Status" value={rec.submitted ? "Submitted & Locked" : "In Progress"} />
+                    </div>
+                    <button onClick={() => onContinue(rec)}
+                      className="w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
+                      style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+                      <LogIn size={16} /> Resume {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  </div>
+                );
+              })}
+              <button onClick={() => { setFoundRecords(null); setRetPhone(""); }}
                 className="w-full px-5 py-2 font-mono text-[11px] uppercase tracking-widest transition hover:opacity-70"
                 style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
                 Not me — search again
@@ -523,20 +626,17 @@ function IdentifyScreen({ onContinue }) {
         </div>
       )}
 
-      {/* ── NEW USER ── */}
-      {mode === "new" && (
+      {/* ── NEW PERSONNEL — ONBOARDING ── */}
+      {mode === "new" && type === "onboarding" && (
         <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-          <div>
-            <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Process Type</label>
-            <div className="grid grid-cols-2 gap-2">
-              {["onboarding", "offboarding"].map((t) => (
-                <button key={t} onClick={() => setType(t)}
-                  className="px-4 py-3 font-display font-semibold uppercase tracking-wider text-sm transition"
-                  style={{ background: type === t ? COLORS.primary : "transparent", color: type === t ? "#0d0d0d" : COLORS.primary, border: `1px solid ${COLORS.primary}` }}>
-                  {t}
-                </button>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            {["onboarding", "offboarding"].map((t) => (
+              <button key={t} onClick={() => setType(t)}
+                className="px-4 py-3 font-display font-semibold uppercase tracking-wider text-sm transition"
+                style={{ background: type === t ? COLORS.primary : "transparent", color: type === t ? "#0d0d0d" : COLORS.primary, border: `1px solid ${COLORS.primary}` }}>
+                {t}
+              </button>
+            ))}
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -551,30 +651,68 @@ function IdentifyScreen({ onContinue }) {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Vocation</label>
-              <select value={vocation} onChange={(e) => setVocation(e.target.value)} className="w-full px-3 py-2.5 outline-none text-sm" style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }}>
-                <option>Regular (C4X)</option>
-                <option>Regular (DCX)</option>
+              <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Scheme</label>
+              <select value={vocation} onChange={(e) => { setVocation(e.target.value); setVocOther(""); }} className="w-full px-3 py-2.5 outline-none text-sm" style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }}>
+                <option>Regular (C4X/DCX)</option>
                 <option>DigiSpec</option>
                 <option>ST Engineer</option>
                 <option>DTC</option>
                 <option>Other</option>
               </select>
+              {vocation === "Other" && (
+                <input type="text" value={vocOther} onChange={(e) => setVocOther(e.target.value)}
+                  placeholder="Specify Scheme"
+                  className="w-full px-3 py-2.5 outline-none text-sm mt-2"
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }} />
+              )}
             </div>
-            <Field label={type === "onboarding" ? "Reporting Date" : "Last Day"} value={keyDate} onChange={(v) => { setKeyDate(v); setErrors((e) => ({ ...e, keyDate: undefined })); }} type="date" error={errors.keyDate} />
+            <Field label="Reporting Date" value={keyDate} onChange={(v) => { setKeyDate(v); setErrors((e) => ({ ...e, keyDate: undefined })); }} type="date" error={errors.keyDate} />
           </div>
 
-          {errors._ && (
-            <div className="flex items-center gap-2 text-sm font-mono" style={{ color: "#e05c5c" }}>
-              <AlertCircle size={16} /> {errors._}
-            </div>
-          )}
+          {errors._ && <div className="flex items-center gap-2 text-sm font-mono" style={{ color: "#e05c5c" }}><AlertCircle size={16} /> {errors._}</div>}
 
           <button onClick={handleContinue} disabled={loading}
             className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
             style={{ background: COLORS.primary, color: "#0d0d0d" }}>
             {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
-            {loading ? "Loading…" : "Begin Checklist"}
+            {loading ? "Loading…" : "Begin Onboarding"}
+          </button>
+        </div>
+      )}
+
+      {/* ── NEW PERSONNEL — OFFBOARDING ── */}
+      {mode === "new" && type === "offboarding" && (
+        <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+          <div className="grid grid-cols-2 gap-2">
+            {["onboarding", "offboarding"].map((t) => (
+              <button key={t} onClick={() => setType(t)}
+                className="px-4 py-3 font-display font-semibold uppercase tracking-wider text-sm transition"
+                style={{ background: type === t ? COLORS.primary : "transparent", color: type === t ? "#0d0d0d" : COLORS.primary, border: `1px solid ${COLORS.primary}` }}>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-sm" style={{ color: COLORS.textMuted }}>
+            Enter your registered phone number and last day. Your personal details will be retrieved from your onboarding record.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Phone Number" value={offPhone}
+              onChange={(v) => { setOffPhone(v); setOffErrors((e) => ({ ...e, offPhone: undefined })); }}
+              placeholder="e.g. 91234567 or +6591234567" mono error={offErrors.offPhone} />
+            <Field label="Last Day" value={offKeyDate}
+              onChange={(v) => { setOffKeyDate(v); setOffErrors((e) => ({ ...e, offKeyDate: undefined })); }}
+              type="date" error={offErrors.offKeyDate} />
+          </div>
+
+          {offErrors._ && <div className="flex items-center gap-2 text-sm font-mono" style={{ color: "#e05c5c" }}><AlertCircle size={16} /> {offErrors._}</div>}
+
+          <button onClick={handleOffboardContinue} disabled={offLoading}
+            className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
+            style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+            {offLoading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+            {offLoading ? "Loading…" : "Begin Offboarding"}
           </button>
         </div>
       )}
@@ -766,16 +904,17 @@ function ItemRow({ item, onChange, readOnly = false }) {
 
 function DeclarationScreen({ record, setRecord, onSign, onBack }) {
   const [typedName, setTypedName] = useState("");
-  const [typedEmail, setTypedEmail] = useState("");
+  const [typedPhone, setTypedPhone] = useState("");
   const [agreed, setAgreed] = useState(false);
   const nameMatches = typedName.trim().toUpperCase() === record.name.trim().toUpperCase();
-  const emailMatches = typedEmail.trim().toLowerCase() === record.email.toLowerCase();
-  const canSubmit = nameMatches && emailMatches && agreed;
+  const phoneMatches = normalisePhone(typedPhone.trim()) === record.phoneNumber;
+  const canSubmit = nameMatches && phoneMatches && agreed;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
     const submittedAt = new Date().toISOString();
-    setRecord((r) => ({ ...r, submitted: true, submittedAt, declarationName: typedName.trim(), declarationEmail: typedEmail.trim() }));
+    const refNumber = generateRefNumber(record.phoneNumber, submittedAt);
+    setRecord((r) => ({ ...r, submitted: true, submittedAt, declarationName: typedName.trim(), declarationPhone: record.phoneNumber, refNumber }));
     onSign();
   };
 
@@ -830,14 +969,14 @@ function DeclarationScreen({ record, setRecord, onSign, onBack }) {
 
           <div>
             <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>
-              Personal email <span style={{ color: COLORS.accent }}>(must match exactly)</span>
+              Phone number <span style={{ color: COLORS.accent }}>(must match exactly)</span>
             </label>
-            <input type="email" value={typedEmail} onChange={(e) => setTypedEmail(e.target.value)} placeholder={record.email}
+            <input type="tel" value={typedPhone} onChange={(e) => setTypedPhone(e.target.value)} placeholder={record.phoneNumber}
               className="w-full px-4 py-3 outline-none text-base font-mono"
-              style={{ background: COLORS.bg, border: `2px solid ${typedEmail && emailMatches ? COLORS.success : COLORS.border}`, color: COLORS.text }} />
-            {typedEmail && (
-              <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: emailMatches ? COLORS.success : "#e05c5c" }}>
-                {emailMatches ? "✓ Email matches record" : "Email does not match"}
+              style={{ background: COLORS.bg, border: `2px solid ${typedPhone && phoneMatches ? COLORS.success : COLORS.border}`, color: COLORS.text, colorScheme: "dark" }} />
+            {typedPhone && (
+              <div className="font-mono text-[10px] uppercase tracking-widest mt-1.5" style={{ color: phoneMatches ? COLORS.success : "#e05c5c" }}>
+                {phoneMatches ? "✓ Phone matches record" : "Phone does not match"}
               </div>
             )}
           </div>
@@ -879,16 +1018,23 @@ function SubmittedScreen({ record, onHome, isAdmin = false }) {
         </p>
       </div>
 
+      {record.refNumber && (
+        <div className="mb-4 px-5 py-4 text-center" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
+          <div className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: COLORS.textMuted }}>Declaration Reference</div>
+          <div className="font-mono font-bold text-2xl tracking-widest" style={{ color: COLORS.primary }}>{record.refNumber}</div>
+          <div className="font-mono text-[10px] mt-1" style={{ color: COLORS.textMuted }}>Screenshot this for your records</div>
+        </div>
+      )}
+
       <div className="surface-shadow p-5 sm:p-6 space-y-1" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
         <DataRow label="Personnel" value={`${record.rank} ${record.name}`} />
         <DataRow label="Phone Number" value={record.phoneNumber} mono />
-        <DataRow label="Personal Email" value={record.email} />
         <DataRow label="Vocation" value={record.vocation} />
         <DataRow label="Process" value={record.type.toUpperCase()} />
         <DataRow label={record.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(record.keyDate)} />
         <DataRow label="Required Items" value={`${stats.done} / ${stats.total} completed`} />
         <DataRow label="Signed As" value={record.declarationName} />
-        <DataRow label="Signed Email" value={record.declarationEmail || record.email} />
+        <DataRow label="Signed Phone" value={record.declarationPhone || record.phoneNumber} mono />
         <DataRow label="Submitted On" value={new Date(record.submittedAt).toLocaleString("en-SG", { dateStyle: "full", timeStyle: "short" })} />
       </div>
 
@@ -935,7 +1081,7 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
   const fetchRecords = () => {
     setRecordsError(null);
     listAllRecords()
-      .then((r) => setRecords(r || []))
+      .then((r) => setRecords((r || []).map(reconcileRecord)))
       .catch((e) => { setRecords([]); setRecordsError(e.message); });
   };
 

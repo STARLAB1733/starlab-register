@@ -7,11 +7,18 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    const { serviceNumber } = req.body;
+    const { serviceNumber, recordType } = req.body;
     if (!serviceNumber) return res.status(400).json({ error: "serviceNumber required" });
+    if (!recordType) return res.status(400).json({ error: "recordType required" });
 
     const redis = getRedis();
-    const record = await redis.get(`record:${serviceNumber}`);
+
+    // Try new key first, fall back to legacy key for onboarding records
+    let record = await redis.get(`record:${recordType}:${serviceNumber}`);
+    if (!record && recordType === "onboarding") {
+      record = await redis.get(`record:${serviceNumber}`);
+    }
+
     res.status(200).json({ record: record || null });
   } catch (err) {
     res.status(500).json({ error: "Failed to get record", detail: err.message });
