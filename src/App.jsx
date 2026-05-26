@@ -58,8 +58,7 @@ const ONBOARDING = [
       { id: "s2-01", task: "Security obligations brief (OSA & NDA acknowledgment, breach consequences)" },
       { id: "s2-12", task: "Personnel Disciplinary Brief" },
       { id: "s2-05", task: "Information classification & handling procedures (marking, storage, transmission and access controls)" },
-      { id: "s2-07", task: "Physical office access provisioned (door card / biometric / escort)" },
-      { id: "s2-13", task: "Onboard office pass to security system" },
+      { id: "s2-07", task: "Office access provisioned & registered on security system (door card / biometric)" },
       { id: "s2-08", task: "Safe combination / key custody assignment (if applicable)" },
       { id: "s2-09", task: "Mobile device & BYOD policy briefing" },
       { id: "s2-10", task: "Cybersecurity awareness brief (phishing, passwords, incident reporting)" },
@@ -119,7 +118,8 @@ const OFFBOARDING = [
     key: "pre", category: "Notice & Handover Planning",
     poc: "Branch Head, S1 & Takeover Personnel", icon: ClipboardList,
     items: [
-      { id: "off-pre-01", task: "Resignation / posting order acknowledged for successor identified (Optional)" },
+      { id: "off-pre-01", task: "Resignation / posting order acknowledged (Optional)" },
+      { id: "off-pre-09", task: "Out-of-office auto-reply configured before last day" },
       { id: "off-pre-02", task: "All S-branches notified of departure" },
       { id: "off-pre-03", task: "Handover plan & timeline agreed with Branch Head" },
       { id: "off-pre-04", task: "Successor identified (if known)" },
@@ -178,14 +178,15 @@ const OFFBOARDING = [
       { id: "off-dpi-03", task: "Personal drive files transferred / archived" },
       { id: "off-dpi-04", task: "Code repository access revoked" },
       { id: "off-dpi-05", task: "Device wiped & reimaged" },
+      { id: "off-dpi-06", task: "Meeting invites removed & calendar access revoked" },
     ]
   },
   {
     key: "last", category: "Last Day Clearance",
     poc: "ME4 Anthony Tan / ME6 Lee Chen Yong", icon: UserCheck,
     items: [
-      { id: "off-last-01", task: "All clearance signatures obtained (S1, S2, S3, S4, DPI)" },
-      { id: "off-last-05", task: "All keys & access cards confirmed returned (iSAC, office, locker, safe)" },
+      { id: "off-last-01", task: "All clearance approval obtained (S1, S2, S3, S4, DPI)" },
+      { id: "off-last-05", task: "Final sign-off: all keys & access cards returned (iSAC, office, locker, safe)" },
       { id: "off-last-03", task: "Exit interview with CO / Branch Head completed" },
     ]
   },
