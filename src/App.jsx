@@ -118,11 +118,11 @@ const OFFBOARDING = [
     key: "pre", category: "Notice & Handover Planning",
     poc: "Branch Head, S1 & Takeover Personnel", icon: ClipboardList,
     items: [
-      { id: "off-pre-01", task: "Resignation / posting order acknowledged (Optional)" },
+      { id: "off-pre-01", task: "Resignation / posting order acknowledged" },
       { id: "off-pre-09", task: "Out-of-office auto-reply configured before last day" },
       { id: "off-pre-02", task: "All S-branches notified of departure" },
       { id: "off-pre-03", task: "Handover plan & timeline agreed with Branch Head" },
-      { id: "off-pre-04", task: "Successor identified (if known)" },
+      { id: "off-pre-04", task: "Successor identified (Optional)" },
       { id: "off-pre-05", task: "Appointment handover notes drafted & reviewed" },
       { id: "off-pre-06", task: "Knowledge transfer sessions completed" },
       { id: "off-pre-07", task: "Project documentation & files handed over" },
@@ -133,8 +133,8 @@ const OFFBOARDING = [
     key: "s1", category: "S1 — Manpower Officer",
     poc: "ME4 Anthony Tan", icon: User,
     items: [
-      { id: "off-s1-04", task: "eHR record updated to departed status" },
       { id: "off-s1-05", task: "Exit documentation completed" },
+      { id: "off-s1-07", task: "Complete offboarding with HQ JIC MP Branch" },
       { id: "off-s1-06", task: "Collect office access pass" },
     ]
   },
