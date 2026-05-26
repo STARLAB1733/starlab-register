@@ -603,20 +603,30 @@ function IdentifyScreen({ onContinue }) {
                 const rec = foundRecords[t];
                 if (!rec) return null;
                 return (
-                  <div key={t} className="surface-shadow p-5 space-y-3" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
-                    <div className="space-y-1">
-                      <DataRow label="Name" value={`${rec.rank} ${rec.name}`} />
-                      <DataRow label="Phone" value={rec.phoneNumber} mono />
-                      <DataRow label="Process" value={rec.type.toUpperCase()} />
-                      <DataRow label={rec.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(rec.keyDate)} />
-                      <DataRow label="Status" value={rec.submitted ? "Submitted & Locked" : "In Progress"} />
-                    </div>
-                    <button onClick={() => onContinue(rec)}
-                      className="w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
-                      style={{ background: COLORS.primary, color: "#0d0d0d" }}>
-                      <LogIn size={16} /> Resume {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
-                  </div>
+                  {(() => {
+                    const statusLabel = rec.approved ? "Approved" : rec.rejected ? "Rejected — Re-sign Required" : rec.submitted ? "Pending S1 Approval" : "In Progress";
+                    const statusColor = rec.approved ? COLORS.success : rec.rejected ? "#e05c5c" : rec.submitted ? "#d97706" : COLORS.textMuted;
+                    const borderColor = rec.approved ? COLORS.success : rec.rejected ? "#e05c5c" : rec.submitted ? "#d97706" : COLORS.primary;
+                    return (
+                      <div key={t} className="surface-shadow p-5 space-y-3" style={{ background: COLORS.surface, border: `1px solid ${borderColor}` }}>
+                        <div className="space-y-1">
+                          <DataRow label="Name" value={`${rec.rank} ${rec.name}`} />
+                          <DataRow label="Phone" value={rec.phoneNumber} mono />
+                          <DataRow label="Process" value={rec.type.toUpperCase()} />
+                          <DataRow label={rec.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(rec.keyDate)} />
+                          <div className="flex items-baseline justify-between gap-4 py-2 border-b last:border-b-0" style={{ borderColor: COLORS.border }}>
+                            <div className="font-mono text-[10px] uppercase tracking-widest shrink-0" style={{ color: COLORS.textMuted }}>Status</div>
+                            <div className="text-sm text-right font-semibold font-mono" style={{ color: statusColor }}>{statusLabel}</div>
+                          </div>
+                        </div>
+                        <button onClick={() => onContinue(rec)}
+                          className="w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
+                          style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+                          <LogIn size={16} /> {rec.approved ? "View" : rec.rejected ? "Re-sign" : rec.submitted ? "View Status" : "Resume"} {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </button>
+                      </div>
+                    );
+                  })()}
                 );
               })}
               <button onClick={() => { setFoundRecords(null); setRetPhone(""); }}
