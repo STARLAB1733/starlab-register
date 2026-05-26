@@ -5,35 +5,10 @@ import {
   AlertCircle, ArrowLeft, ClipboardList, LogIn, Loader2
 } from "lucide-react";
 import { saveRecord, loadRecord, loadBothRecords, listAllRecords, approveRecord } from "./lib/storage";
-
-// ============================================================
-// VALIDATION HELPERS
-// ============================================================
-const validatePhone = (v) => {
-  const cleaned = v.replace(/\s/g, "");
-  return /^(\+65)?[89]\d{7}$/.test(cleaned);
-};
-const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-const validateDate = (v) => {
-  if (!v) return "Required";
-  const [y, m, d] = v.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const day = date.getDay();
-  if (day === 0 || day === 6) return "Must be a weekday (Mon–Fri)";
-  const oneYearFromNow = new Date();
-  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-  if (date > oneYearFromNow) return "Date must be within 1 year from today";
-  return null;
-};
-const normalisePhone = (v) => {
-  const cleaned = v.replace(/\s/g, "");
-  return cleaned.startsWith("+65") ? cleaned : `+65${cleaned}`;
-};
-const formatDate = (v) => {
-  if (!v) return v;
-  const [y, m, d] = v.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
-};
+import {
+  validatePhone, validateEmail, validateDate, normalisePhone, formatDate,
+  isOptionalItem, generateRefNumber, reconcileRecord as _reconcileRecord,
+} from "./lib/utils";
 
 // ============================================================
 // CHECKLIST DATA — STARLAB customised
@@ -231,48 +206,9 @@ const COLORS = {
   offboarding: "#7a3010",
 };
 
-const isOptionalItem = (task) => task.includes("(Optional)");
-
-// Deterministic reference number — STL-YYYYMMDD-XXXX
-// Derived from phone digits + submission timestamp so it can be reproduced from the record.
-function generateRefNumber(phoneNumber, submittedAt) {
-  const digits = phoneNumber.replace(/\D/g, "");
-  const ts = new Date(submittedAt).getTime();
-  const seed = (parseInt(digits.slice(-4), 10) * 99991 + (ts % 100000)) % 1679616; // 36^4
-  const code = seed.toString(36).toUpperCase().padStart(4, "0");
-  const date = submittedAt.slice(0, 10).replace(/-/g, "");
-  return `STL-${date}-${code}`;
-}
-
-// Sync a loaded record's sections against the current checklist definition.
-// - Preserves done/doneAt/notes for items that still exist (matched by id)
-// - Drops items removed from the definition
-// - Adds new items with done:false
-// - Updates task text if an item was renamed
-function reconcileRecord(record) {
-  const definition = record.type === "onboarding" ? ONBOARDING : OFFBOARDING;
-  const sectionMap = Object.fromEntries((record.sections || []).map((s) => [s.key, s]));
-  record.sections = definition.map((def) => {
-    const stored = sectionMap[def.key];
-    const itemMap = Object.fromEntries((stored?.items || []).map((it) => [it.id, it]));
-    return {
-      key: def.key,
-      category: def.category,
-      poc: def.poc,
-      items: def.items.map((defItem) => {
-        const existing = itemMap[defItem.id];
-        return {
-          id: defItem.id,
-          task: defItem.task, // always use current definition text
-          done: existing?.done ?? false,
-          doneAt: existing?.doneAt ?? null,
-          notes: existing?.notes ?? "",
-        };
-      }),
-    };
-  });
-  return record;
-}
+// Thin wrapper: binds reconcileRecord to the live ONBOARDING/OFFBOARDING definitions.
+const reconcileRecord = (record) =>
+  _reconcileRecord(record, record.type === "onboarding" ? ONBOARDING : OFFBOARDING);
 
 // ============================================================
 // APP
@@ -604,31 +540,27 @@ function IdentifyScreen({ onContinue }) {
               {["onboarding", "offboarding"].map((t) => {
                 const rec = foundRecords[t];
                 if (!rec) return null;
+                const statusLabel = rec.approved ? "Approved" : rec.rejected ? "Rejected — Re-sign Required" : rec.submitted ? "Pending S1 Approval" : "In Progress";
+                const statusColor = rec.approved ? COLORS.success : rec.rejected ? "#e05c5c" : rec.submitted ? "#d97706" : COLORS.textMuted;
+                const borderColor = rec.approved ? COLORS.success : rec.rejected ? "#e05c5c" : rec.submitted ? "#d97706" : COLORS.primary;
                 return (
-                  {(() => {
-                    const statusLabel = rec.approved ? "Approved" : rec.rejected ? "Rejected — Re-sign Required" : rec.submitted ? "Pending S1 Approval" : "In Progress";
-                    const statusColor = rec.approved ? COLORS.success : rec.rejected ? "#e05c5c" : rec.submitted ? "#d97706" : COLORS.textMuted;
-                    const borderColor = rec.approved ? COLORS.success : rec.rejected ? "#e05c5c" : rec.submitted ? "#d97706" : COLORS.primary;
-                    return (
-                      <div key={t} className="surface-shadow p-5 space-y-3" style={{ background: COLORS.surface, border: `1px solid ${borderColor}` }}>
-                        <div className="space-y-1">
-                          <DataRow label="Name" value={`${rec.rank} ${rec.name}`} />
-                          <DataRow label="Phone" value={rec.phoneNumber} mono />
-                          <DataRow label="Process" value={rec.type.toUpperCase()} />
-                          <DataRow label={rec.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(rec.keyDate)} />
-                          <div className="flex items-baseline justify-between gap-4 py-2 border-b last:border-b-0" style={{ borderColor: COLORS.border }}>
-                            <div className="font-mono text-[10px] uppercase tracking-widest shrink-0" style={{ color: COLORS.textMuted }}>Status</div>
-                            <div className="text-sm text-right font-semibold font-mono" style={{ color: statusColor }}>{statusLabel}</div>
-                          </div>
-                        </div>
-                        <button onClick={() => onContinue(rec)}
-                          className="w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
-                          style={{ background: COLORS.primary, color: "#0d0d0d" }}>
-                          <LogIn size={16} /> {rec.approved ? "View" : rec.rejected ? "Re-sign" : rec.submitted ? "View Status" : "Resume"} {t.charAt(0).toUpperCase() + t.slice(1)}
-                        </button>
+                  <div key={t} className="surface-shadow p-5 space-y-3" style={{ background: COLORS.surface, border: `1px solid ${borderColor}` }}>
+                    <div className="space-y-1">
+                      <DataRow label="Name" value={`${rec.rank} ${rec.name}`} />
+                      <DataRow label="Phone" value={rec.phoneNumber} mono />
+                      <DataRow label="Process" value={rec.type.toUpperCase()} />
+                      <DataRow label={rec.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(rec.keyDate)} />
+                      <div className="flex items-baseline justify-between gap-4 py-2 border-b last:border-b-0" style={{ borderColor: COLORS.border }}>
+                        <div className="font-mono text-[10px] uppercase tracking-widest shrink-0" style={{ color: COLORS.textMuted }}>Status</div>
+                        <div className="text-sm text-right font-semibold font-mono" style={{ color: statusColor }}>{statusLabel}</div>
                       </div>
-                    );
-                  })()}
+                    </div>
+                    <button onClick={() => onContinue(rec)}
+                      className="w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
+                      style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+                      <LogIn size={16} /> {rec.approved ? "View" : rec.rejected ? "Re-sign" : rec.submitted ? "View Status" : "Resume"} {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  </div>
                 );
               })}
               <button onClick={() => { setFoundRecords(null); setRetPhone(""); }}

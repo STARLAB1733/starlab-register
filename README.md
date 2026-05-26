@@ -43,6 +43,7 @@ Pending S1 Approval
 | Backend | Vercel Serverless Functions (Node.js) |
 | Database | Redis via `ioredis` |
 | Hosting | Vercel |
+| Testing | Vitest 3, React Testing Library, MSW 2 |
 
 ---
 
@@ -66,7 +67,7 @@ ADMIN_PASSWORD=<your chosen passphrase>
 
 ## Local Development
 
-Prerequisites: **Node.js v18+**
+Prerequisites: **Node.js v20+**
 
 ```bash
 npm install
@@ -74,6 +75,62 @@ npm run dev
 ```
 
 Opens at `http://localhost:5173`. Use `vercel dev` if you need the serverless functions to run locally alongside the frontend.
+
+---
+
+## Testing
+
+The test suite covers validation logic, storage layer, API serverless functions, and full end-to-end UI flows.
+
+```bash
+npm test               # run all tests once
+npm run test:watch     # watch mode
+npm run test:coverage  # run with V8 coverage report
+```
+
+### Test layout
+
+```
+src/
+  lib/
+    utils.js                        ← extracted pure functions (testable in isolation)
+  __tests__/
+    utils.test.js                   ← unit: validatePhone, validateDate, generateRefNumber, reconcileRecord, …
+    storage.test.js                 ← unit: saveRecord, loadRecord, approveRecord, listAllRecords
+    flows/
+      onboarding.test.jsx           ← flow: new onboarding identify → checklist → declaration → submitted
+      returning.test.jsx            ← flow: returning user lookup, record cards, re-sign after rejection
+      admin.test.jsx                ← flow: admin login, approval, rejection, logout
+  mocks/
+    handlers.js                     ← MSW request handlers + shared test fixtures
+    server.js                       ← MSW server setup
+
+api/
+  __tests__/
+    helpers.js                      ← shared mock req/res helpers
+    save-record.test.js             ← API: lock enforcement, validation, Redis interaction
+    approve-record.test.js          ← API: auth, approve/reject state transitions
+    verify-admin.test.js            ← API: HMAC token generation, timing-safe auth
+    get-record.test.js              ← API: key lookup, legacy key fallback
+    list-records.test.js            ← API: deduplication, empty/partial results
+```
+
+### Coverage targets
+
+| Metric | Threshold |
+|---|---|
+| Lines | 80% |
+| Functions | 80% |
+| Branches | 75% |
+| Statements | 80% |
+
+### Key design decisions
+
+- **Vitest + jsdom** for component tests — zero config, native ESM, same ecosystem as Vite.
+- **MSW 2** intercepts all `fetch` calls at the network level, so component and storage tests exercise real request logic rather than spying on module imports.
+- **API functions tested directly** (no HTTP layer) with an in-memory Redis mock (`vi.mock("../_redis.js")`). Each test controls `mockGet`/`mockSet` return values to verify lock logic precisely.
+- **Pure utility functions** (`src/lib/utils.js`) are unit-tested in complete isolation with no React imports.
+- Component flow tests render the full `<App />` and drive interactions via `@testing-library/user-event`, so they catch integration bugs that unit tests miss.
 
 ---
 
@@ -139,22 +196,28 @@ All endpoints accept `POST` with `Content-Type: application/json`.
 ```
 starlab-register/
 ├── api/
-│   ├── _redis.js           ← Redis client singleton
-│   ├── get-record.js       ← fetch a single record
-│   ├── save-record.js      ← create or update a record (with lock enforcement)
-│   ├── list-records.js     ← fetch all records for admin view
-│   ├── verify-admin.js     ← authenticate admin and issue session token
-│   └── approve-record.js   ← approve or reject a submitted record
+│   ├── _redis.js               ← Redis client singleton
+│   ├── get-record.js           ← fetch a single record
+│   ├── save-record.js          ← create or update a record (with lock enforcement)
+│   ├── list-records.js         ← fetch all records for admin view
+│   ├── verify-admin.js         ← authenticate admin and issue session token
+│   ├── approve-record.js       ← approve or reject a submitted record
+│   └── __tests__/              ← API unit tests (Node environment, Redis mocked)
 ├── public/
 │   └── starlab-logo.png
 ├── src/
-│   ├── main.jsx            ← React entry point
-│   ├── App.jsx             ← all UI, logic, and checklist definitions
+│   ├── main.jsx                ← React entry point
+│   ├── App.jsx                 ← all UI, logic, and checklist definitions
 │   ├── lib/
-│   │   └── storage.js      ← API call wrappers
-│   └── index.css           ← Tailwind base
+│   │   ├── storage.js          ← API call wrappers
+│   │   └── utils.js            ← pure validation and record utility functions
+│   ├── mocks/                  ← MSW handlers and server for tests
+│   ├── __tests__/              ← component and storage unit tests
+│   ├── test-setup.js           ← Vitest global setup (MSW, jest-dom)
+│   └── index.css               ← Tailwind base
 ├── index.html
 ├── vite.config.js
+├── vitest.config.js
 ├── tailwind.config.js
 └── package.json
 ```
