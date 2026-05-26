@@ -90,7 +90,7 @@ const ONBOARDING = [
     items: [
       { id: "s6-01", task: "Onboard to STARQUEST2.0" },
       { id: "s6-02", task: "Annual Training Calendar and Exercise Brief" },
-      { id: "s6-03", task: "Mandatory training enrollment" },
+      { id: "s6-03", task: "Training Enrollment (Optional)" },
     ]
   },
   {
@@ -117,9 +117,9 @@ const ONBOARDING = [
 const OFFBOARDING = [
   {
     key: "pre", category: "Notice & Handover Planning",
-    poc: "Branch Head / S1", icon: ClipboardList,
+    poc: "Branch Head, S1 & Takeover Personnel", icon: ClipboardList,
     items: [
-      { id: "off-pre-01", task: "Resignation / posting order acknowledged by S1" },
+      { id: "off-pre-01", task: "Resignation / posting order acknowledged for successor identified (Optional)" },
       { id: "off-pre-02", task: "All S-branches notified of departure" },
       { id: "off-pre-03", task: "Handover plan & timeline agreed with Branch Head" },
       { id: "off-pre-04", task: "Successor identified (if known)" },
@@ -135,16 +135,15 @@ const OFFBOARDING = [
     items: [
       { id: "off-s1-04", task: "eHR record updated to departed status" },
       { id: "off-s1-05", task: "Exit documentation completed" },
+      { id: "off-s1-06", task: "Collect office access pass" },
     ]
   },
   {
     key: "s2", category: "S2 — Security Officer",
     poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
     items: [
-      { id: "off-s2-01", task: "Classified documents returned & accounted for" },
-      { id: "off-s2-02", task: "Safe keys / combinations returned & reset" },
-      { id: "off-s2-03", task: "Office access card returned" },
-      { id: "off-s2-07", task: "iSAC card returned & deactivated" },
+      { id: "off-s2-01", task: "Classified documents returned & accounted for (Optional)" },
+      { id: "off-s2-02", task: "Safe keys / combinations returned & reset (Optional)" },
       { id: "off-s2-04", task: "Biometric access revoked" },
       { id: "off-s2-05", task: "Exit security briefing completed" },
       { id: "off-s2-06", task: "Post-employment OSA acknowledgment signed" },
@@ -164,10 +163,8 @@ const OFFBOARDING = [
     items: [
       { id: "off-s4-01", task: "Laptop / workstation returned" },
       { id: "off-s4-02", task: "Peripherals returned" },
-      { id: "off-s4-03", task: "Locker emptied & key reset; all drawn keys to be returned" },
-      { id: "off-s4-04", task: "Uniform items returned (if applicable)" },
-      { id: "off-s4-05", task: "Office / room keys returned (all sets accounted for)" },
-      { id: "off-s4-06", task: "Safe / cabinet keys returned" },
+      { id: "off-s4-03", task: "Locker emptied & key reset (Optional)" },
+      { id: "off-s4-05", task: "Office, room, safe & cabinet keys returned (Optional)" },
       { id: "off-s4-08", task: "Any other drawn equipment / stores items returned" },
     ]
   },
@@ -175,7 +172,8 @@ const OFFBOARDING = [
     key: "dpi", category: "DPI — Digital Infrastructure",
     poc: "ME4 Wong Jiong Yu", icon: Server,
     items: [
-      { id: "off-dpi-01", task: "Defence mail account deactivation (applies for personnel leaving organisation)" },
+      { id: "off-dpi-07", task: "iSAC card returned & deactivated" },
+      { id: "off-dpi-01", task: "Defence mail account deactivation (applies for personnel leaving organisation) (Optional)" },
       { id: "off-dpi-02", task: "Email auto-forward / handover configured" },
       { id: "off-dpi-03", task: "Personal drive files transferred / archived" },
       { id: "off-dpi-04", task: "Code repository access revoked" },
@@ -187,7 +185,6 @@ const OFFBOARDING = [
     poc: "ME4 Anthony Tan / ME6 Lee Chen Yong", icon: UserCheck,
     items: [
       { id: "off-last-01", task: "All clearance signatures obtained (S1, S2, S3, S4, DPI)" },
-      { id: "off-last-02", task: "Return camp pass to S1" },
       { id: "off-last-05", task: "All keys & access cards confirmed returned (iSAC, office, locker, safe)" },
       { id: "off-last-03", task: "Exit interview with CO / Branch Head completed" },
     ]
@@ -750,7 +747,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
   return (
     <div>
       <button onClick={onBack} className="font-mono text-xs uppercase tracking-widest mb-4 inline-flex items-center gap-1 hover:opacity-70" style={{ color: COLORS.textMuted }}>
-        <ArrowLeft size={12} /> {isAdmin ? "Back to Register" : "Change Details"}
+        <ArrowLeft size={12} /> {isAdmin ? "Back to Register" : "Save & Exit"}
       </button>
 
       <div className="surface-shadow mb-6 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
@@ -851,6 +848,13 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
             style={{ background: allDone ? COLORS.primary : COLORS.border, color: allDone ? "#0d0d0d" : COLORS.textMuted }}>
             Proceed to Declaration <ChevronRight size={16} />
           </button>
+          {!allDone && (
+            <button onClick={onBack}
+              className="w-full px-5 py-3 font-mono text-[11px] uppercase tracking-widest transition hover:opacity-70"
+              style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
+              Save & Exit — progress is auto-saved
+            </button>
+          )}
         </div>
       )}
     </div>
