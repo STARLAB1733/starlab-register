@@ -1212,7 +1212,10 @@ function DataRow({ label, value, mono = false }) {
 }
 
 function AdminScreen({ onView, onLogout, refreshToken }) {
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem("starlab_admin_auth") === "1");
+  const [authed, setAuthed] = useState(() =>
+    sessionStorage.getItem("starlab_admin_auth") === "1" &&
+    !!sessionStorage.getItem("starlab_admin_token")
+  );
   const [pw, setPw] = useState("");
   const [pwError, setPwError] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
