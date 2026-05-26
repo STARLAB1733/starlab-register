@@ -285,6 +285,7 @@ export default function App() {
 
   useEffect(() => {
     if (!record) return;
+    if (record.approved) return; // approved records are fully locked server-side
     setSaveStatus("saving");
     const timer = setTimeout(() => {
       saveRecord(record)
@@ -309,7 +310,7 @@ export default function App() {
 
   // Force-save current record before navigating away from checklist
   const leaveChecklist = async (nextFn) => {
-    if (record) {
+    if (record && !record.approved) {
       try { await saveRecord(record); } catch { /* best-effort */ }
     }
     nextFn();

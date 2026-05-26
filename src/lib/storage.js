@@ -39,6 +39,7 @@ export async function saveRecord(record) {
     body: JSON.stringify({ serviceNumber: record.phoneNumber, record: JSON.stringify(record) }),
   });
   if (!res.ok) {
+    if (res.status === 403) return; // record is approved and locked — silently skip
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Failed to save record");
   }
