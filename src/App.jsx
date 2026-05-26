@@ -851,7 +851,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
           </button>
           {!allDone && (
             <button onClick={onBack}
-              className="w-full px-5 py-3 font-mono text-[11px] uppercase tracking-widest transition hover:opacity-70"
+              className="w-full px-5 py-3 font-mono text-[11px] uppercase tracking-widest transition hover:opacity-70 mt-3"
               style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
               Save & Exit — progress is auto-saved
             </button>
