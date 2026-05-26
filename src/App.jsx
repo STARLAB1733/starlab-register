@@ -1093,6 +1093,17 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
   // Fetch on login, and re-fetch whenever admin returns from viewing a record (refreshToken changes)
   useEffect(() => { if (authed) fetchRecords(); }, [authed, refreshToken]);
 
+  const filtered = useMemo(() => {
+    if (!records) return [];
+    return records.filter((r) => {
+      if (filter === "onboarding") return r.type === "onboarding";
+      if (filter === "offboarding") return r.type === "offboarding";
+      if (filter === "submitted") return r.submitted;
+      if (filter === "inprogress") return !r.submitted;
+      return true;
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [records, filter]);
+
   if (!authed) {
     const handleAuth = async (e) => {
       e.preventDefault();
@@ -1144,17 +1155,6 @@ function AdminScreen({ onView, onLogout, refreshToken }) {
       </div>
     );
   }
-
-  const filtered = useMemo(() => {
-    if (!records) return [];
-    return records.filter((r) => {
-      if (filter === "onboarding") return r.type === "onboarding";
-      if (filter === "offboarding") return r.type === "offboarding";
-      if (filter === "submitted") return r.submitted;
-      if (filter === "inprogress") return !r.submitted;
-      return true;
-    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [records, filter]);
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
