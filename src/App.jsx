@@ -43,10 +43,11 @@ const ONBOARDING = [
     key: "s1", category: "S1 — Manpower Officer",
     poc: "ME4 Anthony Tan", icon: User,
     items: [
-      { id: "s1-01", task: "Complete welcome briefing" },
+      { id: "s1-00", task: "Onboarded to STARLAB Register" },
+      { id: "s1-01", task: "Collect welcome gift" },
       { id: "s1-02", task: "Verify personal particulars (email, phone number, dob, address, nok)" },
-      { id: "s1-03", task: "Collect camp pass / access card application" },
-      { id: "s1-04", task: "Workspace Code of Conduct, Ethics and Policy" },
+      { id: "s1-03", task: "Collect office access pass" },
+      { id: "s1-04", task: "Workspace Code of Conduct, Ethics, Culture and Policy" },
       { id: "s1-08", task: "Facilities orientation tour (pantry, restrooms, fire exits, smoking points)" },
     ]
   },
@@ -54,12 +55,11 @@ const ONBOARDING = [
     key: "s2", category: "S2 — Security Officer",
     poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
     items: [
-      { id: "s2-01", task: "Security indoctrination briefing (incl. OSA & NDA acknowledgment)" },
+      { id: "s2-01", task: "Security obligations brief (OSA & NDA acknowledgment, breach consequences)" },
       { id: "s2-12", task: "Personnel Disciplinary Brief" },
-      { id: "s2-04", task: "MSD Security clearance level" },
-      { id: "s2-05", task: "Classified information handling brief (marking / storage / transmission)" },
-      { id: "s2-06", task: "Information management & data classification brief" },
+      { id: "s2-05", task: "Information classification & handling procedures (marking, storage, transmission and access controls)" },
       { id: "s2-07", task: "Physical office access provisioned (door card / biometric / escort)" },
+      { id: "s2-13", task: "Onboard office pass to security system" },
       { id: "s2-08", task: "Safe combination / key custody assignment (if applicable)" },
       { id: "s2-09", task: "Mobile device & BYOD policy briefing" },
       { id: "s2-10", task: "Cybersecurity awareness brief (phishing, passwords, incident reporting)" },
@@ -71,8 +71,6 @@ const ONBOARDING = [
     poc: "ME4 Ryan Tan", icon: Briefcase,
     items: [
       { id: "s3-01", task: "Branch structure & org chart walkthrough" },
-      { id: "s3-04", task: "Team introductions completed" },
-      { id: "s3-05", task: "SOPs & playbooks familiarized" },
       { id: "s3-06", task: "Current operations & priorities briefed" },
       { id: "s3-07", task: "Reporting lines & escalation paths understood" },
     ]
@@ -84,8 +82,6 @@ const ONBOARDING = [
       { id: "s4-01", task: "Laptop / workstation drawn (loan record signed)" },
       { id: "s4-02", task: "Peripherals drawn (monitor, keyboard, mouse, headset)" },
       { id: "s4-04", task: "Briefing of shared locker usage" },
-      { id: "s4-05", task: "Uniform items (rank, name tag, unit patch) — regulars only" },
-      { id: "s4-06", task: "Onboard office pass to security system" },
     ]
   },
   {
@@ -99,12 +95,13 @@ const ONBOARDING = [
   },
   {
     key: "dpi", category: "DPI — Digital Infrastructure",
-    poc: "DPI POC / IT Support", icon: Server,
+    poc: "ME4 Wong Jiong Yu", icon: Server,
     items: [
-      { id: "dpi-02", task: "Onboard defence mail" },
+      { id: "dpi-02", task: "Onboard defence mail (Optional)" },
       { id: "dpi-04", task: "Onboard to STARLAB Repository (Optional)" },
       { id: "dpi-06", task: "Access to SharePoint, TeamSite and Telegram" },
       { id: "dpi-08", task: "Request OSN/SNET card (Optional)" },
+      { id: "dpi-09", task: "Issue of JPE Token and Account Onboarding (Optional)" },
     ]
   },
   {
@@ -176,7 +173,7 @@ const OFFBOARDING = [
   },
   {
     key: "dpi", category: "DPI — Digital Infrastructure",
-    poc: "DPI POC / IT Support", icon: Server,
+    poc: "ME4 Wong Jiong Yu", icon: Server,
     items: [
       { id: "off-dpi-01", task: "Defence mail account deactivation (applies for personnel leaving organisation)" },
       { id: "off-dpi-02", task: "Email auto-forward / handover configured" },
@@ -345,7 +342,7 @@ function Header({ onAdmin, onHome, isAdmin }) {
         <button onClick={onHome} className="flex items-center gap-3 group">
           <img src="/starlab-logo.png" alt="STARLAB" className="h-10 sm:h-12 w-auto object-contain" />
           <div className="font-mono text-[10px] sm:text-xs uppercase tracking-widest" style={{ color: COLORS.textMuted }}>
-            STARLAB Personnel Register
+            STARLAB Register
           </div>
         </button>
         <button
@@ -363,12 +360,22 @@ function Header({ onAdmin, onHome, isAdmin }) {
 function Footer() {
   return (
     <footer className="max-w-4xl mx-auto px-4 sm:px-6 py-8 mt-8 font-mono text-[10px] uppercase tracking-widest text-center" style={{ color: COLORS.textMuted, borderTop: `1px solid ${COLORS.border}` }}>
-      <div className="pt-6">STARLAB · S1 Branch · Personnel Onboarding & Offboarding Register · v2.0</div>
+      <div className="pt-6">STARLAB · S1 Branch · STARLAB Register · v2.0</div>
     </footer>
   );
 }
 
 function IdentifyScreen({ onContinue }) {
+  const [mode, setMode] = useState("new"); // "new" | "returning"
+
+  // Returning user state
+  const [retPhone, setRetPhone] = useState("");
+  const [retPhoneError, setRetPhoneError] = useState("");
+  const [retLoading, setRetLoading] = useState(false);
+  const [foundRecord, setFoundRecord] = useState(null);
+  const [notFound, setNotFound] = useState(false);
+
+  // New user state
   const [type, setType] = useState("onboarding");
   const [name, setName] = useState("");
   const [rank, setRank] = useState("");
@@ -379,6 +386,34 @@ function IdentifyScreen({ onContinue }) {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  const switchMode = (m) => {
+    setMode(m);
+    setFoundRecord(null);
+    setNotFound(false);
+    setRetPhoneError("");
+    setErrors({});
+  };
+
+  // ── Returning: phone lookup ──
+  const handleLookup = async () => {
+    if (!retPhone.trim()) { setRetPhoneError("Required"); return; }
+    if (!validatePhone(retPhone)) { setRetPhoneError("Enter a valid SG mobile (8-digit starting with 8 or 9, or +65 prefix)"); return; }
+    setRetPhoneError("");
+    setRetLoading(true);
+    setNotFound(false);
+    setFoundRecord(null);
+    try {
+      const key = normalisePhone(retPhone.trim());
+      const existing = await loadRecord(key);
+      if (existing) { setFoundRecord(existing); } else { setNotFound(true); }
+    } catch {
+      setRetPhoneError("Connection error. Please try again.");
+    } finally {
+      setRetLoading(false);
+    }
+  };
+
+  // ── New user: full form ──
   const validate = () => {
     const e = {};
     if (!name.trim()) e.name = "Required";
@@ -425,63 +460,124 @@ function IdentifyScreen({ onContinue }) {
       <div className="mb-8">
         <div className="font-mono text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>// Step 1 of 3</div>
         <h1 className="font-display font-bold text-3xl sm:text-4xl uppercase tracking-wide leading-none mb-3">Personnel Identification</h1>
-        <p className="text-sm sm:text-base" style={{ color: COLORS.textMuted }}>
-          Enter your details to begin or resume your checklist. Returning? Use the same phone number to pick up where you left off.
-        </p>
       </div>
 
-      <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
-        <div>
-          <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Process Type</label>
-          <div className="grid grid-cols-2 gap-2">
-            {["onboarding", "offboarding"].map((t) => (
-              <button key={t} onClick={() => setType(t)}
-                className="px-4 py-3 font-display font-semibold uppercase tracking-wider text-sm transition"
-                style={{ background: type === t ? COLORS.primary : "transparent", color: type === t ? "#0d0d0d" : COLORS.primary, border: `1px solid ${COLORS.primary}` }}>
-                {t}
+      {/* Mode toggle */}
+      <div className="grid grid-cols-2 gap-0 mb-6" style={{ border: `1px solid ${COLORS.primary}` }}>
+        {[{ v: "new", l: "New Personnel" }, { v: "returning", l: "Returning Personnel" }].map(({ v, l }) => (
+          <button key={v} onClick={() => switchMode(v)}
+            className="px-4 py-3 font-display font-semibold uppercase tracking-wider text-sm transition"
+            style={{ background: mode === v ? COLORS.primary : "transparent", color: mode === v ? "#0d0d0d" : COLORS.primary }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* ── RETURNING USER ── */}
+      {mode === "returning" && (
+        <div className="space-y-4">
+          {!foundRecord ? (
+            <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
+              <p className="text-sm" style={{ color: COLORS.textMuted }}>
+                Enter your registered phone number to retrieve your record and pick up where you left off.
+              </p>
+              <Field label="Phone Number" value={retPhone}
+                onChange={(v) => { setRetPhone(v); setRetPhoneError(""); setNotFound(false); }}
+                placeholder="e.g. 91234567 or +6591234567" mono error={retPhoneError} />
+              {notFound && (
+                <div className="flex items-start gap-2 text-sm font-mono p-3" style={{ background: "#1a0a0a", border: "1px solid #e05c5c", color: "#e05c5c" }}>
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  <span>No record found for this number. Please register as <button onClick={() => switchMode("new")} className="underline">New Personnel</button>.</span>
+                </div>
+              )}
+              <button onClick={handleLookup} disabled={retLoading}
+                className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
+                style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+                {retLoading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                {retLoading ? "Retrieving…" : "Retrieve Record"}
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
+              <div className="font-mono text-[11px] uppercase tracking-widest" style={{ color: COLORS.accent }}>// Record Found</div>
+              <div className="space-y-1">
+                <DataRow label="Name" value={`${foundRecord.rank} ${foundRecord.name}`} />
+                <DataRow label="Phone" value={foundRecord.phoneNumber} mono />
+                <DataRow label="Vocation" value={foundRecord.vocation} />
+                <DataRow label="Process" value={foundRecord.type.toUpperCase()} />
+                <DataRow label={foundRecord.type === "onboarding" ? "Reporting Date" : "Last Day"} value={formatDate(foundRecord.keyDate)} />
+                <DataRow label="Status" value={foundRecord.submitted ? "Submitted & Locked" : "In Progress"} />
+              </div>
+              <button onClick={() => onContinue(foundRecord)}
+                className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition"
+                style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+                <LogIn size={16} /> Resume Checklist
+              </button>
+              <button onClick={() => { setFoundRecord(null); setRetPhone(""); }}
+                className="w-full px-5 py-2 font-mono text-[11px] uppercase tracking-widest transition hover:opacity-70"
+                style={{ border: `1px solid ${COLORS.border}`, color: COLORS.textMuted }}>
+                Not me — search again
+              </button>
+            </div>
+          )}
         </div>
+      )}
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Full Name" value={name} onChange={(v) => { setName(v); setErrors((e) => ({ ...e, name: undefined })); }} placeholder="e.g. Tan Wei Ming" error={errors.name} />
-          <Field label="Rank / Title" value={rank} onChange={(v) => { setRank(v); setErrors((e) => ({ ...e, rank: undefined })); }} placeholder="e.g. ME4 / Mr. / Ms." error={errors.rank} />
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Phone Number" value={phone} onChange={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: undefined })); }} placeholder="e.g. 91234567 or +6591234567" mono error={errors.phone} />
-          <Field label="Personal Email" value={email} onChange={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: undefined })); }} placeholder="e.g. name@gmail.com" error={errors.email} />
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
+      {/* ── NEW USER ── */}
+      {mode === "new" && (
+        <div className="surface-shadow p-5 sm:p-7 space-y-5" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
           <div>
-            <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Vocation</label>
-            <select value={vocation} onChange={(e) => setVocation(e.target.value)} className="w-full px-3 py-2.5 outline-none text-sm" style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }}>
-              <option>Regular (C4X)</option>
-              <option>Regular (DCX)</option>
-              <option>DigiSpec</option>
-              <option>ST Engineer</option>
-              <option>DTC</option>
-              <option>Other</option>
-            </select>
+            <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Process Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {["onboarding", "offboarding"].map((t) => (
+                <button key={t} onClick={() => setType(t)}
+                  className="px-4 py-3 font-display font-semibold uppercase tracking-wider text-sm transition"
+                  style={{ background: type === t ? COLORS.primary : "transparent", color: type === t ? "#0d0d0d" : COLORS.primary, border: `1px solid ${COLORS.primary}` }}>
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
-          <Field label={type === "onboarding" ? "Reporting Date" : "Last Day"} value={keyDate} onChange={(v) => { setKeyDate(v); setErrors((e) => ({ ...e, keyDate: undefined })); }} type="date" error={errors.keyDate} />
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Full Name" value={name} onChange={(v) => { setName(v); setErrors((e) => ({ ...e, name: undefined })); }} placeholder="e.g. Tan Wei Ming" error={errors.name} />
+            <Field label="Rank / Title" value={rank} onChange={(v) => { setRank(v); setErrors((e) => ({ ...e, rank: undefined })); }} placeholder="e.g. ME4 / Mr. / Ms." error={errors.rank} />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Phone Number" value={phone} onChange={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: undefined })); }} placeholder="e.g. 91234567 or +6591234567" mono error={errors.phone} />
+            <Field label="Personal Email" value={email} onChange={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: undefined })); }} placeholder="e.g. name@gmail.com" error={errors.email} />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>Vocation</label>
+              <select value={vocation} onChange={(e) => setVocation(e.target.value)} className="w-full px-3 py-2.5 outline-none text-sm" style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.text }}>
+                <option>Regular (C4X)</option>
+                <option>Regular (DCX)</option>
+                <option>DigiSpec</option>
+                <option>ST Engineer</option>
+                <option>DTC</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <Field label={type === "onboarding" ? "Reporting Date" : "Last Day"} value={keyDate} onChange={(v) => { setKeyDate(v); setErrors((e) => ({ ...e, keyDate: undefined })); }} type="date" error={errors.keyDate} />
+          </div>
+
+          {errors._ && (
+            <div className="flex items-center gap-2 text-sm font-mono" style={{ color: "#e05c5c" }}>
+              <AlertCircle size={16} /> {errors._}
+            </div>
+          )}
+
+          <button onClick={handleContinue} disabled={loading}
+            className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
+            style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+            {loading ? "Loading…" : "Begin Checklist"}
+          </button>
         </div>
-
-        {errors._ && (
-          <div className="flex items-center gap-2 text-sm font-mono" style={{ color: "#e05c5c" }}>
-            <AlertCircle size={16} /> {errors._}
-          </div>
-        )}
-
-        <button onClick={handleContinue} disabled={loading}
-          className="w-full px-5 py-3.5 font-display font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition disabled:opacity-40"
-          style={{ background: COLORS.primary, color: "#0d0d0d" }}>
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
-          {loading ? "Loading…" : "Begin / Resume Checklist"}
-        </button>
-      </div>
+      )}
 
       <div className="mt-6 p-4 font-mono text-xs leading-relaxed" style={{ border: `1px dashed ${COLORS.border}`, color: COLORS.textMuted }}>
         <span className="uppercase font-semibold" style={{ color: COLORS.primary }}>Note:</span> Complete each item in person with the responsible POC. Once all required items are ticked, you will sign a declaration attesting that each briefing was personally received.
@@ -496,7 +592,7 @@ function Field({ label, value, onChange, placeholder, type = "text", mono = fals
       <label className="font-mono text-[11px] uppercase tracking-widest block mb-2" style={{ color: COLORS.textMuted }}>{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
         className={`w-full px-3 py-2.5 outline-none text-sm ${mono ? "font-mono" : ""}`}
-        style={{ background: COLORS.bg, border: `1px solid ${error ? "#e05c5c" : COLORS.border}`, color: COLORS.text }} />
+        style={{ background: COLORS.bg, border: `1px solid ${error ? "#e05c5c" : COLORS.border}`, color: COLORS.text, colorScheme: "dark" }} />
       {error && <div className="font-mono text-[10px] mt-1" style={{ color: "#e05c5c" }}>{error}</div>}
     </div>
   );
