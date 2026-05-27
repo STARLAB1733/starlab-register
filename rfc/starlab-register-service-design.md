@@ -70,7 +70,7 @@ Personnel visit each S-branch POC to complete the relevant items. The checklist 
 | S4 — Logistics | ME4 Claudia Chan |
 | S6 — Training | ME5 Melvin Tan |
 | DPI | ME4 Wong Jiong Yu |
-| Branch Head / Last Day | ME6 Lee Chen Yong / ME4 Anthony Tan |
+| Branch Head / Last Day | ME6 Lee Chen Yong (Br Hd) / ME4 Anthony Tan (S1) |
 
 **Step 3 — Declaration**
 
