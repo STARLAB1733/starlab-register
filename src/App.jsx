@@ -15,8 +15,8 @@ import {
 // ============================================================
 const ONBOARDING = [
   {
-    key: "s1", category: "S1 — Manpower Officer",
-    poc: "ME4 Anthony Tan", icon: User,
+    key: "s1", category: "Manpower (MP) POC",
+    poc: "MP POC", icon: User,
     items: [
       { id: "s1-00", task: "Onboarded to STARLAB Register" },
       { id: "s1-01", task: "Collect welcome gift" },
@@ -27,8 +27,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "s2", category: "S2 — Security Officer",
-    poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
+    key: "s2", category: "Security (SEC) POC",
+    poc: "SEC POC", icon: Shield,
     items: [
       { id: "s2-01", task: "Security obligations brief (OSA & NDA acknowledgment, breach consequences)" },
       { id: "s2-12", task: "Personnel Disciplinary Brief" },
@@ -41,8 +41,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "s3", category: "S3 — Operations Officer",
-    poc: "ME4 Ryan Tan", icon: Briefcase,
+    key: "s3", category: "Operations (OPS) POC",
+    poc: "OPS POC", icon: Briefcase,
     items: [
       { id: "s3-01", task: "Branch structure & org chart walkthrough" },
       { id: "s3-06", task: "Current operations & priorities briefed" },
@@ -50,8 +50,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "s4", category: "S4 — Logistics Officer",
-    poc: "ME4 Claudia Chan", icon: Package,
+    key: "s4", category: "Logistics (LOG) POC",
+    poc: "LOG POC", icon: Package,
     items: [
       { id: "s4-01", task: "Laptop / workstation drawn (loan record signed)" },
       { id: "s4-02", task: "Peripherals drawn (monitor, keyboard, mouse, headset)" },
@@ -59,8 +59,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "s6", category: "S6 — Training & Exercise",
-    poc: "ME5 Melvin Tan", icon: GraduationCap,
+    key: "s6", category: "Training (TRG) POC",
+    poc: "TRG POC", icon: GraduationCap,
     items: [
       { id: "s6-01", task: "Onboard to STARQUEST2.0" },
       { id: "s6-02", task: "Annual Training Calendar and Exercise Brief" },
@@ -68,8 +68,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "dpi", category: "DPI — Digital Infrastructure",
-    poc: "ME4 Wong Jiong Yu", icon: Server,
+    key: "dpi", category: "Digital Infrastructure (IT) POC",
+    poc: "IT/DPI POC", icon: Server,
     items: [
       { id: "dpi-06", task: "Access to SharePoint, TeamSite and Telegram" },
       { id: "dpi-02", task: "Onboard defence mail (Optional)" },
@@ -79,8 +79,8 @@ const ONBOARDING = [
     ]
   },
   {
-    key: "bh", category: "Branch Head",
-    poc: "ME6 Lee Chen Yong", icon: UserCheck,
+    key: "bh", category: "Br Hd",
+    poc: "Br Hd", icon: UserCheck,
     items: [
       { id: "bh-01", task: "1-on-1 onboarding meeting (expectations, working style)" },
       { id: "bh-02", task: "30-day check-in scheduled" },
@@ -90,13 +90,13 @@ const ONBOARDING = [
 
 const OFFBOARDING = [
   {
-    key: "pre", category: "Notice & Handover Planning",
-    poc: "Branch Head, S1 & Takeover Personnel", icon: ClipboardList,
+    key: "pre", category: "Handover Planning",
+    poc: "Br Hd / MP POC", icon: ClipboardList,
     items: [
       { id: "off-pre-01", task: "Resignation / posting order acknowledged" },
       { id: "off-pre-09", task: "Out-of-office auto-reply configured before last day" },
-      { id: "off-pre-02", task: "All S-branches notified of departure" },
-      { id: "off-pre-03", task: "Handover plan & timeline agreed with Branch Head" },
+      { id: "off-pre-02", task: "All branches notified of departure" },
+      { id: "off-pre-03", task: "Handover plan & timeline agreed with Br Hd" },
       { id: "off-pre-04", task: "Successor identified (Optional)" },
       { id: "off-pre-05", task: "Appointment handover notes drafted & reviewed" },
       { id: "off-pre-06", task: "Knowledge transfer sessions completed" },
@@ -105,8 +105,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s1", category: "S1 — Manpower Officer",
-    poc: "ME4 Anthony Tan", icon: User,
+    key: "s1", category: "Manpower (MP) POC",
+    poc: "MP POC", icon: User,
     items: [
       { id: "off-s1-05", task: "Exit documentation completed" },
       { id: "off-s1-07", task: "Complete offboarding with HQ JIC MP Branch" },
@@ -114,8 +114,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s2", category: "S2 — Security Officer",
-    poc: "ME4 Clement Chua, ME4 Jeremy Yang & ME4 Favian Chan", icon: Shield,
+    key: "s2", category: "Security (SEC) POC",
+    poc: "SEC POC", icon: Shield,
     items: [
       { id: "off-s2-01", task: "Classified documents returned & accounted for (Optional)" },
       { id: "off-s2-02", task: "Safe keys / combinations returned & reset (Optional)" },
@@ -125,16 +125,16 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "s3", category: "S3 — Operations Officer",
-    poc: "ME4 Ryan Tan", icon: Briefcase,
+    key: "s3", category: "Operations (OPS) POC",
+    poc: "OPS POC", icon: Briefcase,
     items: [
       { id: "off-s3-01", task: "Project handover acceptance signed off" },
       { id: "off-s3-03", task: "Outstanding work items reassigned" },
     ]
   },
   {
-    key: "s4", category: "S4 — Logistics Officer",
-    poc: "ME4 Claudia Chan", icon: Package,
+    key: "s4", category: "Logistics (LOG) POC",
+    poc: "LOG POC", icon: Package,
     items: [
       { id: "off-s4-01", task: "Laptop / workstation returned" },
       { id: "off-s4-02", task: "Peripherals returned" },
@@ -144,8 +144,8 @@ const OFFBOARDING = [
     ]
   },
   {
-    key: "dpi", category: "DPI — Digital Infrastructure",
-    poc: "ME4 Wong Jiong Yu", icon: Server,
+    key: "dpi", category: "Digital Infrastructure (IT) POC",
+    poc: "IT/DPI POC", icon: Server,
     items: [
       { id: "off-dpi-07", task: "iSAC card returned & deactivated" },
       { id: "off-dpi-01", task: "Defence mail account deactivation (applies for personnel leaving organisation) (Optional)" },
@@ -158,11 +158,11 @@ const OFFBOARDING = [
   },
   {
     key: "last", category: "Last Day Clearance",
-    poc: "ME4 Anthony Tan / ME6 Lee Chen Yong", icon: UserCheck,
+    poc: "MP POC / Br Hd", icon: UserCheck,
     items: [
-      { id: "off-last-01", task: "All clearance approval obtained (S1, S2, S3, S4, DPI)" },
+      { id: "off-last-01", task: "All clearance approval obtained (MP, SEC, OPS, LOG, IT/DPI)" },
       { id: "off-last-05", task: "Final sign-off: all keys & access cards returned (iSAC, office, locker, safe)" },
-      { id: "off-last-03", task: "Exit interview with CO / Branch Head completed" },
+      { id: "off-last-03", task: "Exit interview with Br Hd completed" },
     ]
   },
 ];
