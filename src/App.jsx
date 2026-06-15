@@ -261,14 +261,14 @@ export default function App() {
   const [view, setView] = useState("start");
   const [record, setRecord] = useState(null);
   const [adminMode, setAdminMode] = useState(false);
-  const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | error
+  const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error
 
   useEffect(() => {
     if (!record) return;
     setSaveStatus("saving");
     const timer = setTimeout(() => {
       saveRecord(record)
-        .then(() => setSaveStatus("idle"))
+        .then(() => setSaveStatus("saved"))
         .catch(() => setSaveStatus("error"));
     }, 800);
     return () => clearTimeout(timer);
@@ -390,6 +390,31 @@ function Footer() {
       <div className="pt-6">STARLAB · S1 Branch · Personnel Onboarding & Offboarding Register · v2.0</div>
     </footer>
   );
+}
+
+function SaveStatusBadge({ status }) {
+  if (status === "saving") {
+    return (
+      <div className="font-mono text-[10px] uppercase tracking-widest inline-flex items-center gap-1.5" style={{ color: COLORS.textMuted }}>
+        <Loader2 size={11} className="animate-spin" /> Saving…
+      </div>
+    );
+  }
+  if (status === "saved") {
+    return (
+      <div className="font-mono text-[10px] uppercase tracking-widest inline-flex items-center gap-1.5" style={{ color: COLORS.success }}>
+        <Check size={11} strokeWidth={3} /> All changes saved
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="font-mono text-[10px] uppercase tracking-widest inline-flex items-center gap-1.5" style={{ color: "#e05c5c" }}>
+        <AlertCircle size={11} /> Save failed
+      </div>
+    );
+  }
+  return null;
 }
 
 function TokenBadge({ token, label = "Access Token" }) {
@@ -609,7 +634,7 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
   return (
     <div>
       <button onClick={onBack} className="font-mono text-xs uppercase tracking-widest mb-4 inline-flex items-center gap-1 hover:opacity-70" style={{ color: COLORS.textMuted }}>
-        <ArrowLeft size={12} /> {isAdmin ? "Back to Register" : "Change Details"}
+        <ArrowLeft size={12} /> {isAdmin ? "Back to Register" : "Save & Exit"}
       </button>
 
       <div className="surface-shadow mb-6 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}>
@@ -624,6 +649,11 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
           <div className="mt-2">
             <TokenBadge token={record.token} />
           </div>
+          {!isAdmin && (
+            <div className="font-mono text-[10px] mt-2 flex items-center gap-1.5" style={{ color: COLORS.textMuted }}>
+              <KeyRound size={11} /> Your progress is saved automatically. Use this token to resume on any device, anytime.
+            </div>
+          )}
         </div>
         <div className="sm:text-right">
           <div className="font-display font-bold text-4xl sm:text-5xl leading-none" style={{ color: COLORS.primary }}>
@@ -632,12 +662,9 @@ function ChecklistScreen({ record, updateItem, onSubmit, onBack, isAdmin = false
           <div className="font-mono text-[10px] uppercase tracking-widest mt-1" style={{ color: COLORS.textMuted }}>
             {stats.done} / {stats.total} required
           </div>
-          {saveStatus === "saving" && (
-            <div className="font-mono text-[9px] uppercase tracking-widest mt-1" style={{ color: COLORS.textMuted }}>Saving…</div>
-          )}
-          {saveStatus === "error" && (
-            <div className="font-mono text-[9px] uppercase tracking-widest mt-1" style={{ color: "#e05c5c" }}>Save failed</div>
-          )}
+          <div className="mt-2 sm:flex sm:justify-end">
+            <SaveStatusBadge status={saveStatus} />
+          </div>
         </div>
       </div>
 
