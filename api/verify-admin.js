@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { isAdminAuthorized } from "./_auth.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -11,14 +11,5 @@ export default async function handler(req, res) {
   }
 
   const { password } = req.body;
-  if (!password) return res.status(200).json({ ok: false });
-
-  // Constant-time comparison to prevent timing attacks
-  const stored = Buffer.from(process.env.ADMIN_PASSWORD);
-  const provided = Buffer.from(password);
-  const match =
-    stored.length === provided.length &&
-    crypto.timingSafeEqual(stored, provided);
-
-  res.status(200).json({ ok: match });
+  res.status(200).json({ ok: isAdminAuthorized(password) });
 }

@@ -9,9 +9,9 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    const { serviceNumber, record } = req.body;
+    const { token, record } = req.body;
 
-    if (!serviceNumber) return res.status(400).json({ error: "serviceNumber required" });
+    if (!token) return res.status(400).json({ error: "token required" });
     if (!record) return res.status(400).json({ error: "record required" });
 
     // Validate record is valid JSON
@@ -22,9 +22,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "record must be valid JSON" });
     }
 
-    // Validate serviceNumber matches the record's phoneNumber
-    if (parsed.phoneNumber && parsed.phoneNumber !== serviceNumber) {
-      return res.status(400).json({ error: "serviceNumber mismatch" });
+    // Validate token matches the record's token
+    if (parsed.token && parsed.token !== token) {
+      return res.status(400).json({ error: "token mismatch" });
     }
 
     // Validate record size
@@ -35,23 +35,17 @@ export default async function handler(req, res) {
 
     const redis = getRedis();
 
-    // If an existing record is submitted, only allow adminComment updates
-    const existing = await redis.get(`record:${serviceNumber}`);
-    if (existing) {
-      let existingParsed;
-      try { existingParsed = JSON.parse(existing); } catch { /* ignore */ }
-      if (existingParsed?.submitted) {
-        // Preserve locked fields — only adminComment may change
-        parsed.sections = existingParsed.sections;
-        parsed.submitted = true;
-        parsed.submittedAt = existingParsed.submittedAt;
-        parsed.declarationName = existingParsed.declarationName;
-        parsed.declarationEmail = existingParsed.declarationEmail;
-      }
+    // If an existing record is acknowledged, only allow adminComment updates
+    const existing = await redis.get(`record:${token}`);
+    if (existing?.acknowledged) {
+      // Preserve locked fields — only adminComment may change
+      parsed.sections = existing.sections;
+      parsed.acknowledged = true;
+      parsed.acknowledgedAt = existing.acknowledgedAt;
     }
 
-    await redis.set(`record:${serviceNumber}`, JSON.stringify(parsed));
-    await redis.sadd("all_service_numbers", serviceNumber);
+    await redis.set(`record:${token}`, parsed);
+    await redis.sadd("all_tokens", token);
 
     res.status(200).json({ ok: true });
   } catch (err) {

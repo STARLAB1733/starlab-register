@@ -8,12 +8,8 @@ const API = {
 function patchRecord(record) {
   if (!record) return null;
   if (record.adminComment === undefined) record.adminComment = "";
-  if (record.declarationName === undefined) record.declarationName = "";
-  if (record.declarationEmail === undefined) record.declarationEmail = "";
-  if (record.submitted === undefined) record.submitted = false;
-  if (record.submittedAt === undefined) record.submittedAt = null;
-  if (!record.email) record.email = "";
-  if (!record.phoneNumber) record.phoneNumber = record.serviceNumber || "";
+  if (record.acknowledged === undefined) record.acknowledged = false;
+  if (record.acknowledgedAt === undefined) record.acknowledgedAt = null;
   if (!Array.isArray(record.sections)) record.sections = [];
   record.sections.forEach((s) => {
     if (!Array.isArray(s.items)) s.items = [];
@@ -30,7 +26,7 @@ export async function saveRecord(record) {
   const res = await fetch(API.save, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ serviceNumber: record.phoneNumber, record: JSON.stringify(record) }),
+    body: JSON.stringify({ token: record.token, record: JSON.stringify(record) }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -38,12 +34,12 @@ export async function saveRecord(record) {
   }
 }
 
-export async function loadRecord(phoneNumber) {
+export async function loadRecord(token) {
   try {
     const res = await fetch(API.get, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceNumber: phoneNumber }),
+      body: JSON.stringify({ token }),
     });
     const data = await res.json();
     if (!data.record) return null;
@@ -54,10 +50,11 @@ export async function loadRecord(phoneNumber) {
   }
 }
 
-export async function listAllRecords() {
+export async function listAllRecords(adminPassword) {
   const res = await fetch(API.list, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: adminPassword }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || "Failed to load records");

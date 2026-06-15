@@ -1,23 +1,15 @@
-import Redis from "ioredis";
+import { Redis } from "@upstash/redis";
 
 let client;
 
 export function getRedis() {
   if (!client) {
-    if (!process.env.REDIS_URL) {
-      throw new Error("Missing required environment variable: REDIS_URL");
+    const url = process.env.UPSTASH_REDIS_KV_REST_API_URL;
+    const token = process.env.UPSTASH_REDIS_KV_REST_API_TOKEN;
+    if (!url || !token) {
+      throw new Error("Missing required environment variables: UPSTASH_REDIS_KV_REST_API_URL / UPSTASH_REDIS_KV_REST_API_TOKEN");
     }
-    client = new Redis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: 3,
-      connectTimeout: 5000,
-      lazyConnect: false,
-      tls: process.env.REDIS_URL.startsWith("rediss://") ? {} : undefined,
-    });
-    client.on("error", (err) => {
-      console.error("[Redis] connection error:", err.message);
-      // Reset so next call creates a fresh client
-      client = null;
-    });
+    client = new Redis({ url, token });
   }
   return client;
 }

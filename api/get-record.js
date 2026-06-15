@@ -7,11 +7,11 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    const { serviceNumber } = req.body;
-    if (!serviceNumber) return res.status(400).json({ error: "serviceNumber required" });
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: "token required" });
 
     const redis = getRedis();
-    const record = await redis.get(`record:${serviceNumber}`);
+    const record = await redis.get(`record:${token}`);
     res.status(200).json({ record: record || null });
   } catch (err) {
     res.status(500).json({ error: "Failed to get record", detail: err.message });

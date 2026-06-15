@@ -6,3 +6,7 @@ dist
 .idea
 .env
 .env.local
+
+.vercel
+.env*.local
+.env*
