@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Shield, User, Briefcase, Package, GraduationCap, Server,
   UserCheck, Check, Lock, ChevronRight, ChevronLeft,
-  AlertCircle, Eye, ArrowLeft, ClipboardList, Loader2, Copy, KeyRound, CalendarDays
+  AlertCircle, Eye, ArrowLeft, ClipboardList, Loader2, Copy, KeyRound, CalendarDays, ExternalLink
 } from "lucide-react";
 import { saveRecord, loadRecord, listAllRecords } from "./lib/storage";
 
@@ -251,6 +251,13 @@ const COLORS = {
   onboarding: "#1a6b4a",
   offboarding: "#7a3010",
 };
+
+// Update with live go.gov.sg short links once forms are created on form.gov.sg.
+const FORM_URLS = {
+  onboarding: "https://go.gov.sg/starlab-onboard",
+  offboarding: "https://go.gov.sg/starlab-offboard",
+};
+
 
 const isOptionalItem = (task) => task.includes("(Optional)");
 
@@ -882,7 +889,24 @@ function AcknowledgedScreen({ record, onHome, isAdmin = false }) {
         </div>
       )}
 
-      <button onClick={onHome} className="mt-6 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
+      {!isAdmin && (
+        <div className="mt-6 p-5 sm:p-6 text-center" style={{ background: COLORS.surface, border: `1px solid ${COLORS.primary}` }}>
+          <div className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: COLORS.accent }}>
+            // Final Step — Official Record
+          </div>
+          <p className="text-sm mb-4" style={{ color: COLORS.textMuted }}>
+            Submit your official {record.type} record via <strong style={{ color: COLORS.text }}>form.gov.sg</strong> using SingPass.
+            This is the formal S1 register entry for audit purposes.
+          </p>
+          <a href={FORM_URLS[record.type]} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80"
+            style={{ background: COLORS.primary, color: "#0d0d0d" }}>
+            Submit via form.gov.sg <ExternalLink size={14} />
+          </a>
+        </div>
+      )}
+
+      <button onClick={onHome} className="mt-4 w-full px-5 py-3 font-display font-bold uppercase tracking-widest text-sm transition hover:opacity-80" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary }}>
         {isAdmin ? "Back to Register" : "Return to Start"}
       </button>
     </div>
